@@ -19,7 +19,7 @@ message("------------ Options -------------")
 message("  CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 message("  CMAKE_COMMAND: ${CMAKE_COMMAND}")
 
-set(CMAKE_CXX_FLAGS -std=c++11)
+set(CMAKE_CXX_FLAGS -std=gnu++11)
 set(CMAKE_CXX_FLAGS_DEBUG "-g ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS_RELEASE "-g -O3 ${CMAKE_CXX_FLAGS}")
 
@@ -33,6 +33,8 @@ add_library(${TARGET} STATIC ${LIST_SRC})
 
 # include
 include_directories(${PROJECT_SOURCE_DIR}/libquic)
+include_directories(${PROJECT_SOURCE_DIR}/libquic/third_party/boringssl/src/include)
+include_directories(${PROJECT_SOURCE_DIR}/libquic/third_party/protobuf/src)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/libquic)
 
