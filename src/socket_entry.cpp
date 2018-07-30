@@ -17,9 +17,59 @@ QuicSocketEntry::QuicSocketEntry(QuicConnectionId id)
     SetDelegate(this);
 }
 
-void QuicSocketEntry::Initialize(std::shared_ptr<PacketTransport> packetTransport)
+QuartcFactory& QuicSocketEntry::GetQuartcFactory()
 {
-    packetTransport_ = packetTransport;
+    static QuartcFactory factory(QuartcFactoryConfig{}, [](
+                std::unique_ptr<QuicConnection> connection,
+                const QuicConfig& config,
+                const std::string& unique_remote_server_id,
+                Perspective perspective,
+                QuicConnectionHelperInterface* helper,
+                QuicClock* clock) {
+                    return static_cast<QuartcSessionInterface*>(new QuicSocketEntry(
+                                std::move(connection), config, unique_remote_server_id,
+                                perspective, helper, clock));
+                });
+    return factory;
+}
+
+QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry()
+{
+    int fd = GetFdFactory().Alloc();
+    std::shared_ptr<PacketTransport> packetTransport(new PacketTransport);
+    QuartcSessionConfig config;
+    config.unique_remote_server_id = "";
+    config.packet_transport = packetTransport.get();
+    config.congestion_control = QuartcCongestionControl::kBBR;
+    config.connection_id = QuicRandom::GetInstance()->RandUint64();
+    QuartcSessionInterface* ptr = GetQuartcFactory().CreateQuartcSession(config).release();
+
+    QuicSocketEntryPtr sptr((QuicSocketEntry*)ptr);
+    sptr->SetFd(fd);
+    sptr->packetTransport_ = packetTransport;
+    GetFdManager().Put(fd, sptr);
+    return sptr;
+}
+
+FdFactory & QuicSocketEntry::GetFdFactory()
+{
+    static FdFactory obj;
+    return obj;
+}
+FdManager<QuicSocketEntryPtr> & QuicSocketEntry::GetFdManager()
+{
+    static FdManager<QuicSocketEntryPtr> obj;
+    return obj;
+}
+
+void QuicSocketEntry::DeleteQuicSocketEntry(QuicSocketEntryPtr ptr)
+{
+    int fd = ptr->Fd();
+    if (fd >= 0) {
+        GetFdManager().Delete(fd);
+        GetFdFactory().Free(fd);
+        ptr->SetFd(-1);
+    }
 }
 
 int QuicSocketEntry::CreateNewUdpSocket()
@@ -140,6 +190,19 @@ QuicStreamEntryPtr QuicSocketEntry::AcceptStream()
 
     errno = EAGAIN;
     return QuicStreamEntryPtr();
+}
+
+QuicStreamEntryPtr QuicSocketEntry::CreateStream()
+{
+    if (!IsConnected()) {
+        errno = ENOTCONN;
+        return QuicStreamEntryPtr();
+    }
+
+    std::unique_lock<std::mutex> lock(mtx_);
+    QuicStreamId id = GetNextOutgoingStreamId();
+    GetOrCreateStream(id);
+    return QuicStreamEntry::NewQuicStream(shared_from_this(), id);
 }
 
 QuartcStreamPtr QuicSocketEntry::GetQuartcStream(QuicStreamId streamId)

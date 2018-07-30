@@ -9,7 +9,7 @@ QuicStreamEntry::QuicStreamEntry()
         stream->SetDelegate(this);
 }
 
-ssize_t QuicStreamEntry::Write(const struct iovec* iov, size_t iov_count, bool fin)
+ssize_t QuicStreamEntry::Writev(const struct iovec* iov, size_t iov_count, bool fin)
 {
     if (error) {
         errno = error;
@@ -31,7 +31,7 @@ ssize_t QuicStreamEntry::Write(const struct iovec* iov, size_t iov_count, bool f
     return resData.bytes_consumed;
 }
 
-ssize_t QuicStreamEntry::Read(const struct iovec* iov, size_t iov_count)
+ssize_t QuicStreamEntry::Readv(const struct iovec* iov, size_t iov_count)
 {
     if (error) {
         errno = error;
@@ -97,9 +97,8 @@ void QuicStreamEntry::DeleteQuicStream(QuicStreamEntryPtr const& ptr)
 {
     int fd = ptr->Fd();
     if (fd >= 0) {
-        ptr->Close();
-        GetFdManager().Delete(ptr->Fd());
-        GetFdFactory().Free(ptr->Fd());
+        GetFdManager().Delete(fd);
+        GetFdFactory().Free(fd);
         ptr->SetFd(-1);
     }
 }

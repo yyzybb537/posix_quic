@@ -20,9 +20,9 @@ class QuicStreamEntry
 public:
     QuicStreamEntry(QuicSocketEntryPtr socketEntry, QuicStreamId streamId);
 
-    ssize_t Write(const struct iovec* iov, size_t iov_count, bool fin = false);
+    ssize_t Writev(const struct iovec* iov, size_t iov_count, bool fin = false);
 
-    ssize_t Read(const struct iovec* iov, size_t iov_count);
+    ssize_t Readv(const struct iovec* iov, size_t iov_count);
 
     int Shutdown(int how);
 
@@ -32,15 +32,16 @@ public:
     template <typename ... Args>
     static QuicStreamEntryPtr NewQuicStream(Args && ... args) {
         int fd = GetFdFactory().Alloc();
-        QuicStreamEntryPtr ptr(new QuicStreamEntry(args...));
+        QuicStreamEntryPtr ptr(new QuicStreamEntry(std::forward<Args>(args)...));
+        ptr->SetFd(fd);
         GetFdManager().Put(fd, ptr);
         return ptr;
     }
+    static void DeleteQuicStream(QuicStreamEntryPtr const& ptr);
 
 private:
     static FdFactory & GetFdFactory();
     static FdManager<QuicStreamEntryPtr> & GetFdManager();
-    static void DeleteQuicStream(QuicStreamEntryPtr const& ptr);
 
     // -----------------------------------------------------------------
     // QuartcStreamInterface::Delegate

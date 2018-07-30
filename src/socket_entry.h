@@ -21,8 +21,6 @@ class QuicSocketEntry
 public:
     using QuartcSession::QuartcSession;
 
-    void Initialize(std::shared_ptr<PacketTransport> packetTransport);
-
     // 这个enum糅合了udp和quic两层的状态
     enum QuicSocketState {
         // 没有绑定udp socket
@@ -57,7 +55,8 @@ public:
 
     QuicStreamEntryPtr AcceptStream();
 
-    QuartcStreamPtr GetQuartcStream(QuicStreamId streamId);
+    // create outgoing stream
+    QuicStreamEntryPtr CreateStream();
 
     void CloseStream(uint64_t streamId);
 
@@ -76,6 +75,16 @@ public:
             const QuicSocketAddress& peer_address,
             const QuicReceivedPacket& packet) override;
     // --------------------------------
+
+    QuartcStreamPtr GetQuartcStream(QuicStreamId streamId);
+
+    static QuartcFactory& GetQuartcFactory();
+    static QuicSocketEntryPtr NewQuicSocketEntry();
+    static void DeleteQuicSocketEntry(QuicSocketEntryPtr ptr);
+
+private:
+    static FdFactory & GetFdFactory();
+    static FdManager<QuicSocketEntryPtr> & GetFdManager();
 
     // -----------------------------------------------------------------
     // QuicSessionInterface::Delegate
