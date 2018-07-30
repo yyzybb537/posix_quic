@@ -39,6 +39,12 @@ int QuartcStream::Readv(const struct iovec* iov, size_t iov_len) {
   return res;
 }
 
+QuicConsumedData QuartcStream::WritevData(const struct iovec* iov,
+        int iov_count, bool fin)
+{
+    return QuicStream::WritevData(iov, iov_count, fin);
+}
+
 void QuartcStream::OnClose() {
   QuicStream::OnClose();
   DCHECK(delegate_);

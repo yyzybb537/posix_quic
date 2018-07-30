@@ -56,6 +56,8 @@ class QUIC_EXPORT_PRIVATE QuartcStream : public QuicStream,
 
   int Readv(const struct iovec* iov, size_t iov_len);
 
+  QuicConsumedData WritevData(const struct iovec* iov, int iov_count, bool fin);
+
  private:
   QuartcStreamInterface::Delegate* delegate_ = nullptr;
 };

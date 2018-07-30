@@ -10,6 +10,18 @@
 
 namespace net {
 
+QuartcSessionInterface* DefaultNewQuartcSessionFn(std::unique_ptr<QuicConnection> connection,
+                const QuicConfig& config,
+                const std::string& unique_remote_server_id,
+                Perspective perspective,
+                QuicConnectionHelperInterface* helper,
+                QuicClock* clock)
+{
+    return new QuartcSession(std::move(connection), config,
+            unique_remote_server_id, perspective, helper, clock);
+}
+
+
 namespace {
 
 // Implements the QuicAlarm with QuartcTaskRunnerInterface for the Quartc
@@ -97,9 +109,11 @@ class QuartcClock : public QuicClock {
 
 }  // namespace
 
-QuartcFactory::QuartcFactory(const QuartcFactoryConfig& factory_config)
+QuartcFactory::QuartcFactory(const QuartcFactoryConfig& factory_config, NewQuartcSessionFn fn)
     : task_runner_(factory_config.task_runner),
-      clock_(new QuartcClock(factory_config.clock)) {}
+      clock_(new QuartcClock(factory_config.clock)),
+      new_fn_(fn)
+{}
 
 QuartcFactory::~QuartcFactory() {}
 
@@ -178,7 +192,7 @@ std::unique_ptr<QuartcSessionInterface> QuartcFactory::CreateQuartcSession(
         QuicTime::Delta::FromSeconds(
             quartc_session_config.max_idle_time_before_crypto_handshake_secs));
   }
-  return std::unique_ptr<QuartcSessionInterface>(new QuartcSession(
+  return std::unique_ptr<QuartcSessionInterface>(new_fn_(
       std::move(quic_connection), quic_config,
       quartc_session_config.unique_remote_server_id, perspective,
       this /*QuicConnectionHelperInterface*/, clock_.get()));
