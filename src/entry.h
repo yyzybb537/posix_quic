@@ -10,8 +10,14 @@ namespace posix_quic {
 using net::QuicConnectionId;
 using net::QuicStreamId;
 
-struct EntryBase : public Event
+class EntryBase : public Event
 {
+public:
+    void SetFd(int fd) { fd_ = fd; }
+    int Fd() const { return fd_; }
+
+private:
+    int fd_ = 0;
 };
 
 typedef std::shared_ptr<EntryBase> EntryPtr;

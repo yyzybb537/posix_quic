@@ -4,23 +4,24 @@
 #include <mutex>
 #include <queue>
 #include <set>
+#include "fwd.h"
 #include "entry.h"
 #include "session.h"
+#include "packet_transport.h"
 
 namespace posix_quic {
-
-class QuicSocketEntry;
-typedef std::weak_ptr<QuicSocketEntry> QuicSocketEntryWeakPtr;
-typedef std::shared_ptr<QuicSocketEntry> QuicSocketEntryPtr;
 
 // non-blocking quic fd.
 class QuicSocketEntry
     : public EntryBase,
+    public std::enable_shared_from_this<QuicSocketEntry>,
     public net::QuartcSession,
     private net::QuicSessionInterface::Delegate
 {
 public:
-    QuicSocketEntry(QuicConnectionId id);
+    using QuartcSession::QuartcSession;
+
+    void Initialize(std::shared_ptr<PacketTransport> packetTransport);
 
     // 这个enum糅合了udp和quic两层的状态
     enum QuicSocketState {
@@ -56,6 +57,8 @@ public:
 
     QuicStreamEntryPtr AcceptStream();
 
+    QuartcStreamPtr GetQuartcStream(QuicStreamId streamId);
+
     void CloseStream(uint64_t streamId);
 
     // --------------------------------
@@ -65,29 +68,47 @@ public:
     // --------------------------------
     int NativeUdpFd() const;
 
-    QuicConnectionId GetConnectionId() const;
-
     // --------------------------------
     // Called in epoll trigger loop
-    void OnCanWrite();
+    void OnCanWrite() override;
 
-    void OnCanRead();
+    void ProcessUdpPacket(const QuicSocketAddress& self_address,
+            const QuicSocketAddress& peer_address,
+            const QuicReceivedPacket& packet) override;
     // --------------------------------
 
+    // -----------------------------------------------------------------
+    // QuicSessionInterface::Delegate
 private:
-    void OnAccept(int fd, const char* host, int port);
+    void OnCryptoHandshakeComplete() override;
+
+    void OnIncomingStream(QuartcStreamInterface* stream) override;
+
+    void OnConnectionClosed(int error_code, bool from_remote) override;
+    // -----------------------------------------------------------------
+
+private:
+    void OnAccept(std::shared_ptr<int> udpSocket, const struct sockaddr* addr,
+            socklen_t addrlen);
 
     int CreateNewUdpSocket();
 
 private:
+    std::mutex mtx_;
+
     std::shared_ptr<int> udpSocket_;
-    QuicConnectionId connectionId_ = 0;
     QuicSocketState socketState_ = QuicSocketState_None;
 
-    // accept queue
+    // accept socket queue
     std::mutex acceptQueueMtx_;
     std::queue<QuicSocketEntryPtr> acceptQueue_;
     std::set<QuicSocketEntryPtr> synQueue_;
+
+    // accept stream queue
+    std::mutex streamQueueMtx_;
+    std::queue<QuicSocketEntryPtr> streamQueue_;
+
+    std::shared_ptr<PacketTransport> packetTransport_;
 };
 
 } // namespace posix_quic

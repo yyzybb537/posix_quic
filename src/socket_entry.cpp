@@ -17,6 +17,11 @@ QuicSocketEntry::QuicSocketEntry(QuicConnectionId id)
     SetDelegate(this);
 }
 
+void QuicSocketEntry::Initialize(std::shared_ptr<PacketTransport> packetTransport)
+{
+    packetTransport_ = packetTransport;
+}
+
 int QuicSocketEntry::CreateNewUdpSocket()
 {
     if (udpSocket_) {
@@ -73,7 +78,7 @@ int QuicSocketEntry::Connect(const struct sockaddr* addr, socklen_t addrlen)
             break;
 
         case QuicSocketState_Connecting:
-            errno = EISCONN;
+            errno = EALREADY;
             return -1;
 
         default:
@@ -83,13 +88,14 @@ int QuicSocketEntry::Connect(const struct sockaddr* addr, socklen_t addrlen)
 
     socketState_ = QuicSocketState_Connecting;
 
-    QuartcFactoryInterface::QuartcSessionConfig sessionConfig;
-    sessionConfig.is_server = false;
-    sessionConfig.unique_remote_server_id = serverIp;
-    sessionConfig.packet_transport = mPacketTransport.get();
-    sessionConfig.connection_id = connectionId_;
-    sessionConfig.congestion_control = QuartcCongestionControl::kDefault;
-    // TODO: connect
+    QuicSocketAddress address(*reinterpret_cast<sockaddr_storage*>(addr));
+
+    packetTransport_->Set(udpSocket_, address);
+
+    this->StartCryptoHandshake();
+
+    errno = EINPROGRESS;
+    return -1;
 }
 int QuicSocketEntry::Close()
 {
@@ -97,7 +103,7 @@ int QuicSocketEntry::Close()
     CloseConnection("");
     return 0;
 }
-QuicSocketEntryPtr QuicSocketEntry::Accept()
+QuicSocketEntryPtr QuicSocketEntry::AcceptSocket()
 {
     if (socketState_ != QuicSocketState_Binded) {
         errno = EINVAL;
@@ -114,78 +120,61 @@ QuicSocketEntryPtr QuicSocketEntry::Accept()
     acceptQueue_.pop();
     return ptr;
 }
-std::pair<ssize_t, QuicStreamId> QuicSocketEntry::Write(const void* data,
-        size_t length, QuicStreamId streamId, bool fin)
+QuicStreamEntryPtr QuicSocketEntry::AcceptStream()
 {
-    if (socketState_ != QuicSocketState_Connected) {
-        errno = EINVAL;
-        return -1;
+    if (!IsConnected()) {
+        errno = ENOTCONN;
+        return QuicStreamEntryPtr();
     }
 
-    QuartcStream* outputStream = nullptr;
+    std::unique_lock<std::mutex> lock(streamQueueMtx_);
+    while (!streamQueue_.empty()) {
+        QuicStreamId id = streamQueue_.front();
+        streamQueue_.pop();
 
-    switch (streamId) {
-        case eStreamId_Shared:
-            if (!sharedStreamId_) {
-                outputStream = CreateOutgoingStream(QuartcSessionInterface::OutgoingStreamParameters{});
-                if (outputStream)
-                    sharedStreamId_ = outputStream->stream_id();
-            }
-            break;
+        if (IsClosedStream(id))
+            continue;
 
-        case eStreamId_Last:
-            if (lastStreamId_ && session_->IsOpenStream(lastStreamId_)) {
-                outputStream = (QuartcStream*)session_->GetOrCreateStream(lastStreamId_);
-                break;
-            }
-
-        case eStreamId_AlwaysNew:
-            outputStream = session_->CreateOutgoingStream(QuartcSessionInterface::OutgoingStreamParameters{});
-            break;
-
-        default:
-            outputStream = (QuartcStream*)session_->GetOrCreateStream(streamId);
-            break;
+        return QuicStreamEntry::NewQuicStream(shared_from_this(), id);
     }
 
-    if (!outputStream) {
-        errno = ENOMEM;
-        return -1;
-    }
-
-    scoped_refptr<IOBuffer> buffer(new WrappedIOBuffer(data));
-    QuicMemSliceSpanImpl memSliceSpanImpl(&buffer, &length, 1);
-    QuicMemSliceSpan memSliceSpan(memSliceSpanImpl);
-    QuartcStreamInterface::WriteParameters writeParameters;
-    if (!outputStream->Write(memSliceSpan, writeParameters)) {
-        errno = EAGAIN;
-        return -1;
-    }
-
-    return length;
+    errno = EAGAIN;
+    return QuicStreamEntryPtr();
 }
-std::pair<ssize_t, QuicStreamId> QuicSocketEntry::Read(const void* data,
-        size_t length, QuicStreamId streamId)
+
+QuartcStreamPtr QuicSocketEntry::GetQuartcStream(QuicStreamId streamId)
 {
-    if (socketState_ != QuicSocketState_Connected) {
-        errno = EINVAL;
-        return -1;
-    }
+    std::unique_lock<std::mutex> lock(mtx_);
+    QuicStream* ptr = GetOrCreateStream(streamId);
+    if (!ptr) return QuartcStreamPtr();
+    auto self = this->shared_from_this();
+    lock.release();
 
-    assert(!!session_);
-
-    QuartcStream* outputStream = (QuartcStream*)session_->GetOrCreateStream(streamId);
-
-    if (outputStream->ReadableBytes() == 0) {
-        errno = EAGAIN;
-        return -1;
-    }
+    return QuartcStreamPtr(ptr, [self](QuicStream*){
+                self->mtx_.unlock();
+            });
 }
-void QuicSocketEntry::CloseStream(int streamId)
+
+void QuicSocketEntry::CloseStream(uint64_t streamId)
 {
-    if (session_)
-        session_->CloseStream(streamId);
+    std::unique_lock<std::mutex> lock(mtx_);
+    QuartcSession::CloseStream(streamId);
 }
+
+void QuicSocketEntry::OnCanWrite()
+{
+    std::unique_lock<std::mutex> lock(mtx_);
+    QuartcSession::OnCanWrite();
+}
+
+void QuicSocketEntry::ProcessUdpPacket(const QuicSocketAddress& self_address,
+        const QuicSocketAddress& peer_address,
+        const QuicReceivedPacket& packet)
+{
+    std::unique_lock<std::mutex> lock(mtx_);
+    QuartcSession::ProcessUdpPacket(self_address, peer_address, packet);
+}
+
 bool QuicSocketEntry::IsConnected()
 {
     return socketState_ == QuicSocketState_Connected;
@@ -194,25 +183,29 @@ int QuicSocketEntry::NativeUdpFd()const
 {
     return udpSocket_ ? *udpSocket_ : -1;
 }
-int QuicSocketEntry::GetConnectionId()const 
+void QuicSocketEntry::OnAccept(std::shared_ptr<int> udpSocket,
+        const struct sockaddr* addr, socklen_t addrlen)
 {
-    return connectionId_;
+    socketState_ = QuicSocketState_Shared;
+    udpSocket_ = udpSocket;
 }
-void QuicSocketEntry::OnCanWrite()
-{
 
+void QuicSocketEntry::OnCryptoHandshakeComplete()
+{
+    socketState_ = QuicSocketState_Connected;
+    SetWritable(true);
 }
-void QuicSocketEntry::OnCanRead()
-{
 
+void QuicSocketEntry::OnIncomingStream(QuartcStreamInterface* stream)
+{
+    streamQueue_.push_back(stream->stream_id());
 }
-void QuicSocketEntry::OnError()
-{
 
-}
-void QuicSocketEntry::OnAccept(int fd, const char * host, int port)
+void QuicSocketEntry::OnConnectionClosed(int error_code, bool from_remote)
 {
-
+    socketState_ = QuicSocketState_Closed;
+    SetError(ESHUTDOWN, error_code);
+    SetCloseByPeer(from_remote);
 }
 
 } // namespace posix_quic
