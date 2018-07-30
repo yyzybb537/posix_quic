@@ -13,20 +13,30 @@ QuartcStream::QuartcStream(QuicStreamId id, QuicSession* session)
 QuartcStream::~QuartcStream() {}
 
 void QuartcStream::OnDataAvailable() {
-  struct iovec iov;
-  while (sequencer()->GetReadableRegions(&iov, 1) == 1) {
-    DCHECK(delegate_);
-    delegate_->OnReceived(this, reinterpret_cast<const char*>(iov.iov_base),
-                          iov.iov_len);
-    sequencer()->MarkConsumed(iov.iov_len);
-  }
-  // All the data has been received if the sequencer is closed.
-  // Notify the delegate by calling the callback function one more time with
-  // iov_len = 0.
-  if (sequencer()->IsClosed()) {
+  DCHECK(delegate_);
+  delegate_->OnDataAvailable(this);
+
+//  struct iovec iov;
+//  while (sequencer()->GetReadableRegions(&iov, 1) == 1) {
+//    DCHECK(delegate_);
+//    delegate_->OnReceived(this, reinterpret_cast<const char*>(iov.iov_base),
+//                          iov.iov_len);
+//    sequencer()->MarkConsumed(iov.iov_len);
+//  }
+//  // All the data has been received if the sequencer is closed.
+//  // Notify the delegate by calling the callback function one more time with
+//  // iov_len = 0.
+//  if (sequencer()->IsClosed()) {
+//    OnFinRead();
+//    delegate_->OnReceived(this, reinterpret_cast<const char*>(iov.iov_base), 0);
+//  }
+}
+
+int QuartcStream::Readv(const struct iovec* iov, size_t iov_len) {
+  int res = sequencer()->Readv(iov, iov_len);
+  if (sequencer()->IsClosed())
     OnFinRead();
-    delegate_->OnReceived(this, reinterpret_cast<const char*>(iov.iov_base), 0);
-  }
+  return res;
 }
 
 void QuartcStream::OnClose() {
@@ -90,6 +100,11 @@ void QuartcStream::SetDelegate(QuartcStreamInterface::Delegate* delegate) {
   }
   delegate_ = delegate;
   DCHECK(delegate_);
+}
+
+void QuartcStream::OnCanWriteNewData() {
+  DCHECK(delegate_);
+  delegate_->OnCanWriteNewData(this);
 }
 
 }  // namespace net

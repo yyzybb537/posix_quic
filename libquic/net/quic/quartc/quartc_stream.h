@@ -52,6 +52,10 @@ class QUIC_EXPORT_PRIVATE QuartcStream : public QuicStream,
 
   void SetDelegate(QuartcStreamInterface::Delegate* delegate) override;
 
+  void OnCanWriteNewData() override;
+
+  int Readv(const struct iovec* iov, size_t iov_len);
+
  private:
   QuartcStreamInterface::Delegate* delegate_ = nullptr;
 };

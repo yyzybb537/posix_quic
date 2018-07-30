@@ -44,6 +44,8 @@ class QUIC_EXPORT_PRIVATE QuartcStreamInterface {
   // Does not buffer data.
   virtual bool Write(QuicMemSliceSpan data, const WriteParameters& param) = 0;
 
+  virtual QuicConsumedData WritevData(const struct iovec* iov, int iov_count, bool fin) = 0;
+
   // Marks this stream as finished writing.  Asynchronously sends a FIN and
   // closes the write-side.  The stream will no longer call OnCanWrite().
   // It is not necessary to call FinishWriting() if the last call to Write()
@@ -68,9 +70,11 @@ class QUIC_EXPORT_PRIVATE QuartcStreamInterface {
 
     // Called when the stream receives the data.  Called with |size| == 0 after
     // all stream data has been delivered.
-    virtual void OnReceived(QuartcStreamInterface* stream,
-                            const char* data,
-                            size_t size) = 0;
+//    virtual void OnReceived(QuartcStreamInterface* stream,
+//                            const char* data,
+//                            size_t size) = 0;
+
+    virtual void OnDataAvailable(QuartcStreamInterface* stream) = 0;
 
     // Called when the stream is closed, either locally or by the remote
     // endpoint.  Streams close when (a) fin bits are both sent and received,
@@ -81,6 +85,8 @@ class QUIC_EXPORT_PRIVATE QuartcStreamInterface {
 
     // Called when the contents of the stream's buffer changes.
     virtual void OnBufferChanged(QuartcStreamInterface* stream) = 0;
+
+    virtual void OnCanWriteNewData(QuartcStreamInterface* stream) = 0;
   };
 
   // The |delegate| is not owned by QuartcStream.
