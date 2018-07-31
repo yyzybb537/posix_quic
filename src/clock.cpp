@@ -2,6 +2,12 @@
 
 namespace posix_quic {
 
+QuicClockImpl& QuicClockImpl::getInstance()
+{
+    static QuicClockImpl obj;
+    return obj;
+}
+
 int64_t QuicClockImpl::NowMicroseconds()
 {
     struct timeval timeNow;

@@ -6,6 +6,8 @@
 #include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
+#include "clock.h"
+#include "task_runner.h"
 
 namespace posix_quic {
 
@@ -13,17 +15,19 @@ using namespace net;
 
 QuartcFactory& QuicSocketEntry::GetQuartcFactory()
 {
-    static QuartcFactory factory(QuartcFactoryConfig{}, [](
-                std::unique_ptr<QuicConnection> connection,
+    static QuartcFactory factory(
+            QuartcFactoryConfig{&QuicTaskRunner::getInstance(), &QuicClockImpl::getInstance()},
+            []( std::unique_ptr<QuicConnection> connection,
                 const QuicConfig& config,
                 const std::string& unique_remote_server_id,
                 Perspective perspective,
                 QuicConnectionHelperInterface* helper,
-                QuicClock* clock) {
-                    return static_cast<QuartcSessionInterface*>(new QuicSocketEntry(
-                                std::move(connection), config, unique_remote_server_id,
-                                perspective, helper, clock));
-                });
+                QuicClock* clock)
+            {
+                return static_cast<QuartcSessionInterface*>(new QuicSocketEntry(
+                        std::move(connection), config, unique_remote_server_id,
+                        perspective, helper, clock));
+            });
     return factory;
 }
 

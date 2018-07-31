@@ -158,13 +158,13 @@ int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeou
 
                 QuicSocketEntryPtr socket = QuicSocketEntry::NewQuicSocketEntry();
                 socket->OnSyn(onwer);
-                socket->ProcessUdpPacket(GetLocalAddress(udpFd), MakeAddress(&addr, addrLen), QuicClockImpl().Now());
+                socket->ProcessUdpPacket(GetLocalAddress(udpFd), MakeAddress(&addr, addrLen), QuicClockImpl::getInstance().Now());
                 socket->StartCryptoHandshake();
                 continue;
             }
 
             QuicSocketEntryPtr socket = QuicSocketEntry::GetFdManager().Get(quicSocket);
-            socket->ProcessUdpPacket(GetLocalAddress(udpFd), MakeAddress(&addr, addrLen), QuicClockImpl().Now());
+            socket->ProcessUdpPacket(GetLocalAddress(udpFd), MakeAddress(&addr, addrLen), QuicClockImpl::getInstance().Now());
         }
     }
 }

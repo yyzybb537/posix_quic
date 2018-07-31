@@ -4,7 +4,12 @@
 
 namespace posix_quic {
 
-class QuicClockImpl : public net::QuartcClockInterface {
+class QuicClockImpl
+    : public net::QuartcClockInterface
+{
+public:
+    static QuicClockImpl& getInstance();
+
     int64_t NowMicroseconds() override;
 
     QuicTime Now();
