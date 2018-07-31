@@ -171,13 +171,11 @@ int QuicPoll(struct pollfd *fds, nfds_t nfds, int timeout)
             continue;
         }
 
-        Event::EventWaiter waiter = { pfd.events, &pfd.revents };
+        Event::EventWaiter waiter = { &pfd.events, &pfd.revents };
 
         auto entry = EntryBase::GetFdManager().Get(pfd.fd);
-        int res = entry->StartWait(waiter, &trigger);
-        events |= res;
-        if (res == 0)
-            entries.push_back(entry);
+        events |= entry->StartWait(waiter, &trigger);
+        entries.push_back(entry);
     }
 
     if (events == 0) {
@@ -211,7 +209,7 @@ void QuicCloseEpoller(QuicEpoller epfd)
 
 }
 
-int QuicEpollCtl(QuicEpoller epfd, int op, QuicStream stream, struct epoll_event *event)
+int QuicEpollCtl(QuicEpoller epfd, int op, int quicFd, struct epoll_event *event)
 {
 
 }

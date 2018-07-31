@@ -11,12 +11,6 @@ namespace posix_quic {
 
 using namespace net;
 
-QuicSocketEntry::QuicSocketEntry(QuicConnectionId id)
-    : QuartcSession(id)
-{
-    SetDelegate(this);
-}
-
 QuartcFactory& QuicSocketEntry::GetQuartcFactory()
 {
     static QuartcFactory factory(QuartcFactoryConfig{}, [](
@@ -35,18 +29,27 @@ QuartcFactory& QuicSocketEntry::GetQuartcFactory()
 
 QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry()
 {
+    return NewQuicSocketEntry(QuicRandom::GetInstance()->RandUint64());
+}
+
+QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry(QuicConnectionId id)
+{
     int fd = GetFdFactory().Alloc();
     std::shared_ptr<PacketTransport> packetTransport(new PacketTransport);
     QuartcSessionConfig config;
     config.unique_remote_server_id = "";
     config.packet_transport = packetTransport.get();
     config.congestion_control = QuartcCongestionControl::kBBR;
-    config.connection_id = QuicRandom::GetInstance()->RandUint64();
+    config.connection_id = id;
+    config.max_idle_time_before_crypto_handshake_secs = 10;
+    config.max_time_before_crypto_handshake_secs = 10;
     QuartcSessionInterface* ptr = GetQuartcFactory().CreateQuartcSession(config).release();
 
     QuicSocketEntryPtr sptr((QuicSocketEntry*)ptr);
     sptr->SetFd(fd);
     sptr->packetTransport_ = packetTransport;
+    sptr->SetDelegate(sptr.get());
+
     GetFdManager().Put(fd, sptr);
     return sptr;
 }
@@ -87,7 +90,14 @@ int QuicSocketEntry::CreateNewUdpSocket()
                 delete p;
             });
     socketState_ = QuicSocketState_Inited;
+    GetConnectionManager().Put(*udpSocket_, connection_id(), Fd(), true);
     return 0;
+}
+
+ConnectionManager & QuicSocketEntry::GetConnectionManager()
+{
+    static ConnectionManager obj;
+    return obj;
 }
 
 int QuicSocketEntry::Bind(const struct sockaddr* addr, socklen_t addrlen)
@@ -139,6 +149,8 @@ int QuicSocketEntry::Connect(const struct sockaddr* addr, socklen_t addrlen)
 int QuicSocketEntry::Close()
 {
     socketState_ = QuicSocketState_Closed;
+    if (udpSocket_)
+        GetConnectionManager().Delete(*udpSocket_, connection_id(), Fd());
     CloseConnection("");
     return 0;
 }
@@ -231,21 +243,31 @@ bool QuicSocketEntry::IsConnected()
 {
     return socketState_ == QuicSocketState_Connected;
 }
-int QuicSocketEntry::NativeUdpFd()const 
+std::shared_ptr<int> QuicSocketEntry::NativeUdpFd() const 
 {
-    return udpSocket_ ? *udpSocket_ : -1;
+    return udpSocket_;
 }
-void QuicSocketEntry::OnAccept(std::shared_ptr<int> udpSocket,
-        const struct sockaddr* addr, socklen_t addrlen)
+
+void QuicSocketEntry::PushAcceptQueue(QuicSocketEntryPtr entry)
+{
+    std::unique_lock<std::mutex> lock(acceptQueueMtx_);
+    acceptQueue_.push_back(entry);
+}
+
+void QuicSocketEntry::OnSyn(QuicSocketEntryPtr owner)
 {
     socketState_ = QuicSocketState_Shared;
-    udpSocket_ = udpSocket;
+    udpSocket_ = owner.udpSocket_;
+    GetConnectionManager().Put(*udpSocket_, connection_id(), Fd(), false);
 }
 
 void QuicSocketEntry::OnCryptoHandshakeComplete()
 {
     socketState_ = QuicSocketState_Connected;
     SetWritable(true);
+    if (perspective() == Perspective::IS_SERVER) {
+        // push to owner accept queue.
+    }
 }
 
 void QuicSocketEntry::OnIncomingStream(QuartcStreamInterface* stream)

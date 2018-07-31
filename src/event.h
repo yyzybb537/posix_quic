@@ -13,14 +13,15 @@ public:
     virtual ~Event() {}
 
     struct EventWaiter {
-        int events;
+        int* events;
         int* revents;
     };
 
     struct EventTrigger {
         std::condition_variable cv;
         std::mutex cvMtx;
-        bool triggered = false;
+        volatile bool triggered = false;
+        int epollfd = -1;
 
         void Wait(int timeout);
         void Trigger();

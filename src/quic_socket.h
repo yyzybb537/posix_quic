@@ -4,7 +4,7 @@
  *   1.quic socket由QuicSocket和QuicStream两部分构成, QuicSocket负责连接相关,
  * QuicStream负责数据读写相关, QuicSocket和QuicStream都要使用QuicPoll和
  * QuicEpoller监听.
- *   2.quic socket只有非阻塞模式!
+ *   2.quic socket只有非阻塞模式, 而且必须搭配QuicEpoller使用, 不能独立使用!
  *
  *
 */
@@ -15,8 +15,6 @@
 
 namespace posix_quic {
 
-typedef int QuicSocket;
-typedef int QuicStream;
 
 // 真正的epoll fd, 可用poll、epoll监听
 typedef int QuicEpoller;
@@ -52,7 +50,7 @@ QuicEpoller QuicCreateEpoll();
 
 void QuicCloseEpoller(QuicEpoller epfd);
 
-int QuicEpollCtl(QuicEpoller epfd, int op, QuicStream stream, struct epoll_event *event);
+int QuicEpollCtl(QuicEpoller epfd, int op, int quicFd, struct epoll_event *event);
 
 int QuicEpollWait(QuicEpoller epfd, struct epoll_event *events, int maxevents, int timeout);
 

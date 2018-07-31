@@ -8,6 +8,7 @@
 #include "entry.h"
 #include "session.h"
 #include "packet_transport.h"
+#include "connection_manager.h"
 
 namespace posix_quic {
 
@@ -67,7 +68,7 @@ public:
     bool IsConnected();
 
     // --------------------------------
-    int NativeUdpFd() const;
+    std::shared_ptr<int> NativeUdpFd() const;
 
     // --------------------------------
     // Called in epoll trigger loop
@@ -82,6 +83,7 @@ public:
 
     static QuartcFactory& GetQuartcFactory();
     static QuicSocketEntryPtr NewQuicSocketEntry();
+    static QuicSocketEntryPtr NewQuicSocketEntry(QuicConnectionId id);
     static void DeleteQuicSocketEntry(QuicSocketEntryPtr ptr);
 
     // -----------------------------------------------------------------
@@ -95,10 +97,13 @@ private:
     // -----------------------------------------------------------------
 
 private:
-    void OnAccept(std::shared_ptr<int> udpSocket, const struct sockaddr* addr,
-            socklen_t addrlen);
+    void PushAcceptQueue(QuicSocketEntryPtr entry);
+
+    void OnSyn(QuicSocketEntryPtr owner);
 
     int CreateNewUdpSocket();
+
+    static ConnectionManager & GetConnectionManager();
 
 private:
     std::mutex mtx_;
@@ -109,7 +114,6 @@ private:
     // accept socket queue
     std::mutex acceptQueueMtx_;
     std::queue<QuicSocketEntryPtr> acceptQueue_;
-    std::set<QuicSocketEntryPtr> synQueue_;
 
     // accept stream queue
     std::mutex streamQueueMtx_;

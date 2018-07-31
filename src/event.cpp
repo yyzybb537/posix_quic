@@ -1,5 +1,6 @@
 #include "event.h"
 #include <chrono>
+#include <atomic>
 
 namespace posix_quic {
 
@@ -26,18 +27,15 @@ void Event::EventTrigger::Trigger()
 int Event::StartWait(EventWaiter waiter, EventTrigger * trigger)
 {
     std::unique_lock<std::mutex> lock(mtx_);
-    if ((waiter.events & POLLIN) && Readable())
+    if ((*waiter.events & POLLIN) && Readable())
         *waiter.revents |= POLLIN;
-    if ((waiter.events & POLLOUT) && Writable())
+    if ((*waiter.events & POLLOUT) && Writable())
         *waiter.revents |= POLLOUT;
     if (Error())
         *waiter.revents |= POLLERR;
-    if (*waiter.revents) {
-        return *waiter.revents;
-    }
 
     waitings_[trigger] = waiter;
-    return 0;
+    return *waiter.revents;
 }
 void Event::Trigger(int event)
 {
@@ -45,8 +43,29 @@ void Event::Trigger(int event)
     for (auto & kv : waitings_) {
         EventTrigger * trigger = kv.first;
         EventWaiter & waiter = kv.second;
-        *waiter.revents |= event;
-        trigger->Trigger();
+        switch (event) {
+            case POLLIN:
+                if (*waiter.events & POLLIN) {
+                    std::__atomic_or_fetch(waiter.revents, POLLIN, std::memory_order_seq_cst);
+                    trigger->Trigger();
+                }
+                break;
+
+            case POLLOUT:
+                if (*waiter.events & POLLOUT) {
+                    std::__atomic_or_fetch(waiter.revents, POLLOUT, std::memory_order_seq_cst);
+                    trigger->Trigger();
+                }
+                break;
+
+            case POLLERR:
+                std::__atomic_or_fetch(waiter.revents, POLLERR, std::memory_order_seq_cst);
+                trigger->Trigger();
+                break;
+
+            default:
+                break;
+        }
     }
 }
 
