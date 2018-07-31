@@ -10,17 +10,29 @@ namespace posix_quic {
 using net::QuicConnectionId;
 using net::QuicStreamId;
 
+class EntryBase;
+typedef std::shared_ptr<EntryBase> EntryPtr;
+typedef std::weak_ptr<EntryBase> EntryWeakPtr;
+
+enum class EntryCategory : int8_t {
+    Socket,
+    Stream,
+};
+
 class EntryBase : public Event
 {
 public:
     void SetFd(int fd) { fd_ = fd; }
     int Fd() const { return fd_; }
 
+    virtual EntryCategory Category() const = 0;
+
+protected:
+    static FdFactory & GetFdFactory();
+    static FdManager<EntryPtr> & GetFdManager();
+
 private:
     int fd_ = 0;
 };
-
-typedef std::shared_ptr<EntryBase> EntryPtr;
-typedef std::weak_ptr<EntryBase> EntryWeakPtr;
 
 } // namespace posix_quic

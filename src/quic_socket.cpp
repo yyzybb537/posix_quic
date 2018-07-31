@@ -12,8 +12,9 @@ QuicSocket QuicCreateSocket()
 
 void QuicCloseSocket(QuicSocket sock)
 {
-    auto socket = QuicSocketEntry::GetFdManager().Get(sock);
+    auto socket = EntryBase::GetFdManager().Get(sock);
     if (!socket) return ;
+    if (socket->EntryCategory() != EntryCategory::Socket) return ;
 
     socket->Close();
     QuicSocketEntry::DeleteQuicSocketEntry(socket);
@@ -21,8 +22,8 @@ void QuicCloseSocket(QuicSocket sock)
 
 int QuicBind(QuicSocket sock, const struct sockaddr* addr, socklen_t addrlen)
 {
-    auto socket = QuicSocketEntry::GetFdManager().Get(sock);
-    if (!socket) {
+    auto socket = EntryBase::GetFdManager().Get(sock);
+    if (!socket || socket->EntryCategory() != EntryCategory::Socket) {
         errno = EBADF;
         return -1;
     }
@@ -38,8 +39,8 @@ int QuicListen(QuicSocket sock, int backlog)
 
 int QuicConnect(QuicSocket sock, const struct sockaddr* addr, socklen_t addrlen)
 {
-    auto socket = QuicSocketEntry::GetFdManager().Get(sock);
-    if (!socket) {
+    auto socket = EntryBase::GetFdManager().Get(sock);
+    if (!socket || socket->EntryCategory() != EntryCategory::Socket) {
         errno = EBADF;
         return -1;
     }
@@ -49,8 +50,8 @@ int QuicConnect(QuicSocket sock, const struct sockaddr* addr, socklen_t addrlen)
 
 QuicSocket QuicSocketAccept(QuicSocket listenSock, const struct sockaddr* addr, socklen_t & addrlen)
 {
-    auto socket = QuicSocketEntry::GetFdManager().Get(listenSock);
-    if (!socket) {
+    auto socket = EntryBase::GetFdManager().Get(listenSock);
+    if (!socket || socket->EntryCategory() != EntryCategory::Socket) {
         errno = EBADF;
         return -1;
     }
@@ -63,8 +64,8 @@ QuicSocket QuicSocketAccept(QuicSocket listenSock, const struct sockaddr* addr, 
 
 QuicStream QuicStreamAccept(QuicSocket sock)
 {
-    auto socket = QuicSocketEntry::GetFdManager().Get(sock);
-    if (!socket) {
+    auto socket = EntryBase::GetFdManager().Get(sock);
+    if (!socket || socket->EntryCategory() != EntryCategory::Socket) {
         errno = EBADF;
         return -1;
     }
@@ -77,8 +78,8 @@ QuicStream QuicStreamAccept(QuicSocket sock)
 
 QuicStream QuicCreateStream(QuicSocket sock)
 {
-    auto socket = QuicSocketEntry::GetFdManager().Get(sock);
-    if (!socket) {
+    auto socket = EntryBase::GetFdManager().Get(sock);
+    if (!socket || socket->EntryCategory() != EntryCategory::Socket) {
         errno = EBADF;
         return -1;
     }
@@ -91,8 +92,9 @@ QuicStream QuicCreateStream(QuicSocket sock)
 
 void QuicCloseStream(QuicStream stream)
 {
-    auto streamPtr = QuicStreamEntry::GetFdManager().Get(stream);
+    auto streamPtr = EntryBase::GetFdManager().Get(stream);
     if (!streamPtr) return ;
+    if (streamPtr->EntryCategory() != EntryCategory::Stream) {
 
     streamPtr->Close();
     QuicStreamEntry::DeleteQuicStream(streamPtr);
@@ -101,8 +103,8 @@ void QuicCloseStream(QuicStream stream)
 ssize_t QuicWritev(QuicStream stream, const struct iovec* iov, int iov_count,
         bool fin)
 {
-    auto streamPtr = QuicStreamEntry::GetFdManager().Get(stream);
-    if (!streamPtr) {
+    auto streamPtr = EntryBase::GetFdManager().Get(stream);
+    if (!streamPtr || streamPtr->EntryCategory() != EntryCategory::Stream) {
         errno = EBADF;
         return -1;
     }
@@ -112,8 +114,8 @@ ssize_t QuicWritev(QuicStream stream, const struct iovec* iov, int iov_count,
 
 ssize_t QuicReadv(QuicStream stream, const struct iovec* iov, int iov_count)
 {
-    auto streamPtr = QuicStreamEntry::GetFdManager().Get(stream);
-    if (!streamPtr) {
+    auto streamPtr = EntryBase::GetFdManager().Get(stream);
+    if (!streamPtr || streamPtr->EntryCategory() != EntryCategory::Stream) {
         errno = EBADF;
         return -1;
     }
@@ -124,16 +126,99 @@ ssize_t QuicReadv(QuicStream stream, const struct iovec* iov, int iov_count)
 // poll
 int QuicPoll(struct pollfd *fds, nfds_t nfds, int timeout)
 {
+    if (!nfds) {
+        usleep(timeout * 1000);
+        return -1;
+    }
 
+    if (!timeout) {
+        int res = 0;
+        for (nfds_t i = 0; i < nfds; i++) {
+            struct pollfd & pfd = fds[i];
+            pfd.revents = 0;
+            if (pfd.events == 0)
+                continue;
+
+            if (pfd.fd < 0)
+                continue;
+
+            auto entry = EntryBase::GetFdManager().Get(pfd.fd);
+            if ((pfd.events & POLLIN) && entry->Readable())
+                pfd.revents |= POLLIN;
+            if ((pfd.events & POLLOUT) && entry->Writable())
+                pfd.revents |= POLLOUT;
+            if (entry->Error())
+                pfd.revents |= POLLERR;
+
+            if (pfd.revents != 0)
+                ++res;
+        }
+        return res;
+    }
+
+    std::vector<EntryPtr> entries(nfds);
+    Event::EventTrigger trigger;
+    int res = 0;
+    int events = 0;
+    for (nfds_t i = 0; i < nfds; i++) {
+        struct pollfd & pfd = fds[i];
+        pfd.revents = 0;
+        if (pfd.events == 0) {
+            continue;
+        }
+
+        if (pfd.fd < 0) {
+            continue;
+        }
+
+        Event::EventWaiter waiter = { pfd.events, &pfd.revents };
+
+        auto entry = EntryBase::GetFdManager().Get(pfd.fd);
+        int res = entry->StartWait(waiter, &trigger);
+        events |= res;
+        if (res == 0)
+            entries.push_back(entry);
+    }
+
+    if (events == 0) {
+        // not triggered, wait it.
+        trigger.Wait(timeout);
+    }
+
+    for (auto & entry : entries) {
+        entry->StopWait(&trigger);
+    }
+
+    entries.clear();
+
+    int res = 0;
+    for (nfds_t i = 0; i < nfds; i++) {
+        struct pollfd & pfd = fds[i];
+        if (pfd.revents != 0)
+            ++res;
+    }
+    return res;
 }
 
 // epoll
-QuicEpoller QuicCreateEpoll();
+QuicEpoller QuicCreateEpoll()
+{
 
-void QuicCloseEpoller(QuicEpoller epfd);
+}
 
-int QuicEpollCtl(QuicEpoller epfd, int op, QuicStream stream, struct epoll_event *event);
+void QuicCloseEpoller(QuicEpoller epfd)
+{
 
-int QuicEpollWait(QuicEpoller epfd, struct epoll_event *events, int maxevents, int timeout);
+}
+
+int QuicEpollCtl(QuicEpoller epfd, int op, QuicStream stream, struct epoll_event *event)
+{
+
+}
+
+int QuicEpollWait(QuicEpoller epfd, struct epoll_event *events, int maxevents, int timeout)
+{
+
+}
 
 } // namespace posix_quic

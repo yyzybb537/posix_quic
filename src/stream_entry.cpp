@@ -83,16 +83,6 @@ int QuicStreamEntry::Close()
     stream->Close();
     return 0;
 }
-FdFactory & QuicStreamEntry::GetFdFactory()
-{
-    static FdFactory obj;
-    return obj;
-}
-FdManager<QuicStreamEntryPtr> & QuicStreamEntry::GetFdManager()
-{
-    static FdManager<QuicStreamEntryPtr> obj;
-    return obj;
-}
 void QuicStreamEntry::DeleteQuicStream(QuicStreamEntryPtr const& ptr)
 {
     int fd = ptr->Fd();

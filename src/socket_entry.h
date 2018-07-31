@@ -21,6 +21,8 @@ class QuicSocketEntry
 public:
     using QuartcSession::QuartcSession;
 
+    EntryCategory Category() const override { return EntryCategory::Socket; }
+
     // 这个enum糅合了udp和quic两层的状态
     enum QuicSocketState {
         // 没有绑定udp socket
@@ -81,10 +83,6 @@ public:
     static QuartcFactory& GetQuartcFactory();
     static QuicSocketEntryPtr NewQuicSocketEntry();
     static void DeleteQuicSocketEntry(QuicSocketEntryPtr ptr);
-
-private:
-    static FdFactory & GetFdFactory();
-    static FdManager<QuicSocketEntryPtr> & GetFdManager();
 
     // -----------------------------------------------------------------
     // QuicSessionInterface::Delegate

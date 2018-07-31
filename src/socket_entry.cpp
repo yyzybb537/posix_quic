@@ -51,17 +51,6 @@ QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry()
     return sptr;
 }
 
-FdFactory & QuicSocketEntry::GetFdFactory()
-{
-    static FdFactory obj;
-    return obj;
-}
-FdManager<QuicSocketEntryPtr> & QuicSocketEntry::GetFdManager()
-{
-    static FdManager<QuicSocketEntryPtr> obj;
-    return obj;
-}
-
 void QuicSocketEntry::DeleteQuicSocketEntry(QuicSocketEntryPtr ptr)
 {
     int fd = ptr->Fd();
@@ -267,8 +256,8 @@ void QuicSocketEntry::OnIncomingStream(QuartcStreamInterface* stream)
 void QuicSocketEntry::OnConnectionClosed(int error_code, bool from_remote)
 {
     socketState_ = QuicSocketState_Closed;
-    SetError(ESHUTDOWN, error_code);
     SetCloseByPeer(from_remote);
+    SetError(ESHUTDOWN, error_code);
 }
 
 } // namespace posix_quic

@@ -20,6 +20,8 @@ class QuicStreamEntry
 public:
     QuicStreamEntry(QuicSocketEntryPtr socketEntry, QuicStreamId streamId);
 
+    EntryCategory Category() const override { return EntryCategory::Stream; }
+
     ssize_t Writev(const struct iovec* iov, size_t iov_count, bool fin = false);
 
     ssize_t Readv(const struct iovec* iov, size_t iov_count);
@@ -38,10 +40,6 @@ public:
         return ptr;
     }
     static void DeleteQuicStream(QuicStreamEntryPtr const& ptr);
-
-private:
-    static FdFactory & GetFdFactory();
-    static FdManager<QuicStreamEntryPtr> & GetFdManager();
 
     // -----------------------------------------------------------------
     // QuartcStreamInterface::Delegate
