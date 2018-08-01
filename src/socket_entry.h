@@ -1,14 +1,14 @@
 #pragma once
 
+#include "fwd.h"
 #include <memory>
 #include <mutex>
 #include <queue>
 #include <set>
-#include "fwd.h"
 #include "entry.h"
-#include "session.h"
 #include "packet_transport.h"
 #include "connection_manager.h"
+#include "net/quic/quartc/quartc_session_interface.h"
 
 namespace posix_quic {
 
@@ -16,8 +16,8 @@ namespace posix_quic {
 class QuicSocketEntry
     : public EntryBase,
     public std::enable_shared_from_this<QuicSocketEntry>,
-    public net::QuartcSession,
-    private net::QuicSessionInterface::Delegate
+    public QuartcSession,
+    private QuartcSessionInterface::Delegate
 {
 public:
     using QuartcSession::QuartcSession;
@@ -52,7 +52,7 @@ public:
 
     int Connect(const struct sockaddr* addr, socklen_t addrlen);
 
-    int Close();
+    int Close() override;
 
     QuicSocketEntryPtr AcceptSocket();
 
@@ -68,7 +68,7 @@ public:
     bool IsConnected();
 
     // --------------------------------
-    std::shared_ptr<int> NativeUdpFd() const;
+    std::shared_ptr<int> NativeUdpFd() const override;
 
     // --------------------------------
     // Called in epoll trigger loop
@@ -86,8 +86,12 @@ public:
     static QuicSocketEntryPtr NewQuicSocketEntry(QuicConnectionId id);
     static void DeleteQuicSocketEntry(QuicSocketEntryPtr ptr);
 
+    static ConnectionManager & GetConnectionManager();
+
+    void OnSyn(QuicSocketEntryPtr owner);
+
     // -----------------------------------------------------------------
-    // QuicSessionInterface::Delegate
+    // QuartcSessionInterface::Delegate
 private:
     void OnCryptoHandshakeComplete() override;
 
@@ -99,11 +103,7 @@ private:
 private:
     void PushAcceptQueue(QuicSocketEntryPtr entry);
 
-    void OnSyn(QuicSocketEntryPtr owner);
-
     int CreateNewUdpSocket();
-
-    static ConnectionManager & GetConnectionManager();
 
 private:
     std::mutex mtx_;
@@ -117,9 +117,9 @@ private:
 
     // accept stream queue
     std::mutex streamQueueMtx_;
-    std::queue<QuicSocketEntryPtr> streamQueue_;
+    std::queue<QuicStreamId> streamQueue_;
 
-    std::shared_ptr<PacketTransport> packetTransport_;
+    std::shared_ptr<PosixQuicPacketTransport> packetTransport_;
 };
 
 } // namespace posix_quic

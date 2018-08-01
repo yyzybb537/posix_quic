@@ -10,6 +10,7 @@
 */
 #pragma once
 
+#include "fwd.h"
 #include <memory>
 #include <poll.h>
 
@@ -21,7 +22,7 @@ typedef int QuicEpoller;
 
 QuicSocket QuicCreateSocket();
 
-void QuicCloseSocket(QuicSocket sock);
+int QuicCloseSocket(QuicSocket sock);
 
 int QuicBind(QuicSocket sock, const struct sockaddr* addr, socklen_t addrlen);
 
@@ -35,7 +36,7 @@ QuicStream QuicStreamAccept(QuicSocket sock);
 
 QuicStream QuicCreateStream(QuicSocket sock);
 
-void QuicCloseStream(QuicStream stream);
+int QuicCloseStream(QuicStream stream);
 
 ssize_t QuicWritev(QuicStream stream, const struct iovec* iov, int iov_count,
         bool fin);
@@ -48,7 +49,7 @@ int QuicPoll(struct pollfd *fds, nfds_t nfds, int timeout);
 // epoll
 QuicEpoller QuicCreateEpoll();
 
-void QuicCloseEpoller(QuicEpoller epfd);
+int QuicCloseEpoller(QuicEpoller epfd);
 
 int QuicEpollCtl(QuicEpoller epfd, int op, int quicFd, struct epoll_event *event);
 

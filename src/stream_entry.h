@@ -1,26 +1,25 @@
 #pragma once
 
-#include <memory>
 #include "fwd.h"
+#include <memory>
 #include "entry.h"
-#include "stream.h"
 #include "fd_factory.h"
 #include "fd_manager.h"
 #include "socket_entry.h"
 
 namespace posix_quic {
 
-typedef std::shared_ptr<QuartcStream> QuartcStreamPtr;
-
 class QuicStreamEntry
     : public EntryBase,
     public std::enable_shared_from_this<QuicStreamEntry>,
-    private net::QuartcStreamInterface::Delegate
+    private QuartcStreamInterface::Delegate
 {
 public:
     QuicStreamEntry(QuicSocketEntryPtr socketEntry, QuicStreamId streamId);
 
     EntryCategory Category() const override { return EntryCategory::Stream; }
+
+    std::shared_ptr<int> NativeUdpFd() const override;
 
     ssize_t Writev(const struct iovec* iov, size_t iov_count, bool fin = false);
 
@@ -28,7 +27,7 @@ public:
 
     int Shutdown(int how);
 
-    int Close();
+    int Close() override;
 
 public:
     template <typename ... Args>
@@ -44,20 +43,23 @@ public:
     // -----------------------------------------------------------------
     // QuartcStreamInterface::Delegate
 private:
-    void OnDataAvailable() override;
+    void OnDataAvailable(QuartcStreamInterface* stream) override;
 
     void OnClose(QuartcStreamInterface* stream) override;
 
     void OnBufferChanged(QuartcStreamInterface* stream) override {}
 
-    void OnCanWriteNewData() override;
+    void OnCanWriteNewData(QuartcStreamInterface* stream) override;
     // -----------------------------------------------------------------
 
 private:
     QuartcStreamPtr GetQuartcStream();
 
 private:
+    std::shared_ptr<int> udpSocket_;
+
     QuicSocketEntryWeakPtr socketEntry_;
+
     QuicStreamId streamId_;
 };
 

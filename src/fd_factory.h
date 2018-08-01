@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fwd.h"
 #include <queue>
 #include <mutex>
 

@@ -1,11 +1,12 @@
 #pragma once
 
+#include "fwd.h"
 #include "net/quic/quartc/quartc_factory.h"
 
 namespace posix_quic {
 
-class PacketTransport
-    : public net::QuartcSessionInterface::PacketTransport
+class PosixQuicPacketTransport
+    : public QuartcSessionInterface::PacketTransport
 {
 public:
     void Set(std::shared_ptr<int> udpSocket, QuicSocketAddress const& address);

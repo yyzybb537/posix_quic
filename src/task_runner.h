@@ -1,6 +1,6 @@
 #pragma once
 
-#include "net/quic/quartc/quartc_task_runner_interface.h"
+#include "fwd.h"
 #include <mutex>
 #include <map>
 #include <atomic>
@@ -9,22 +9,26 @@ namespace posix_quic {
 
 // 定时器
 class QuicTaskRunner
-    : public net::QuartcTaskRunnerInterface
+    : public QuartcTaskRunnerInterface
 {
 public:
     static QuicTaskRunner& getInstance();
+
+    using QuartcTaskRunnerInterface::Task;
+
+    struct TaskStorage;
+    typedef std::shared_ptr<TaskStorage> TaskStoragePtr;
+
+    typedef std::multimap<int64_t, TaskStoragePtr> TaskMap;
 
     struct TaskStorage {
         Task * task;
         TaskMap::iterator itr;
         std::atomic_flag invalid{false};
     };
-    typedef std::shared_ptr<TaskStorage> TaskStoragePtr;
-
-    typedef std::multimap<int64_t, TaskStoragePtr> TaskMap;
 
     struct ScheduledTask
-        : public net::QuartcTaskRunnerInterface::ScheduledTask
+        : public QuartcTaskRunnerInterface::ScheduledTask
     {
     public:
         explicit ScheduledTask(TaskStoragePtr storage) : storage_(storage) {}
@@ -39,7 +43,7 @@ public:
         TaskStoragePtr storage_;
     };
 
-    std::unique_ptr<net::QuartcTaskRunnerInterface::ScheduledTask>
+    std::unique_ptr<QuartcTaskRunnerInterface::ScheduledTask>
         Schedule(Task* task, uint64_t delay_ms) override;
 
     void Cancel(TaskMap::iterator itr);

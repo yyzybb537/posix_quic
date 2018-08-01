@@ -8,6 +8,7 @@
 #include <errno.h>
 #include "clock.h"
 #include "task_runner.h"
+#include "stream_entry.h"
 
 namespace posix_quic {
 
@@ -39,8 +40,8 @@ QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry()
 QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry(QuicConnectionId id)
 {
     int fd = GetFdFactory().Alloc();
-    std::shared_ptr<PacketTransport> packetTransport(new PacketTransport);
-    QuartcSessionConfig config;
+    std::shared_ptr<PosixQuicPacketTransport> packetTransport(new PosixQuicPacketTransport);
+    QuartcFactoryInterface::QuartcSessionConfig config;
     config.unique_remote_server_id = "";
     config.packet_transport = packetTransport.get();
     config.congestion_control = QuartcCongestionControl::kBBR;
@@ -108,8 +109,10 @@ int QuicSocketEntry::Bind(const struct sockaddr* addr, socklen_t addrlen)
 {
     switch (socketState_) {
         case QuicSocketState_None:
-            int res = CreateNewUdpSocket();
-            if (res < 0) return -1;
+            {
+                int res = CreateNewUdpSocket();
+                if (res < 0) return -1;
+            }
 
         case QuicSocketState_Inited:
             return ::bind(*udpSocket_, addr, addrlen);
@@ -141,7 +144,7 @@ int QuicSocketEntry::Connect(const struct sockaddr* addr, socklen_t addrlen)
 
     socketState_ = QuicSocketState_Connecting;
 
-    QuicSocketAddress address(*reinterpret_cast<sockaddr_storage*>(addr));
+    QuicSocketAddress address(*reinterpret_cast<const struct sockaddr_storage*>(addr));
 
     packetTransport_->Set(udpSocket_, address);
 
@@ -213,12 +216,12 @@ QuicStreamEntryPtr QuicSocketEntry::CreateStream()
 QuartcStreamPtr QuicSocketEntry::GetQuartcStream(QuicStreamId streamId)
 {
     std::unique_lock<std::mutex> lock(mtx_);
-    QuicStream* ptr = GetOrCreateStream(streamId);
+    QuartcStream* ptr = (QuartcStream*)GetOrCreateStream(streamId);
     if (!ptr) return QuartcStreamPtr();
     auto self = this->shared_from_this();
     lock.release();
 
-    return QuartcStreamPtr(ptr, [self](QuicStream*){
+    return QuartcStreamPtr(ptr, [self](QuartcStream*){
                 self->mtx_.unlock();
             });
 }
@@ -255,13 +258,13 @@ std::shared_ptr<int> QuicSocketEntry::NativeUdpFd() const
 void QuicSocketEntry::PushAcceptQueue(QuicSocketEntryPtr entry)
 {
     std::unique_lock<std::mutex> lock(acceptQueueMtx_);
-    acceptQueue_.push_back(entry);
+    acceptQueue_.push(entry);
 }
 
 void QuicSocketEntry::OnSyn(QuicSocketEntryPtr owner)
 {
     socketState_ = QuicSocketState_Shared;
-    udpSocket_ = owner.udpSocket_;
+    udpSocket_ = owner->udpSocket_;
     GetConnectionManager().Put(*udpSocket_, connection_id(), Fd(), false);
 }
 
@@ -276,7 +279,7 @@ void QuicSocketEntry::OnCryptoHandshakeComplete()
 
 void QuicSocketEntry::OnIncomingStream(QuartcStreamInterface* stream)
 {
-    streamQueue_.push_back(stream->stream_id());
+    streamQueue_.push(stream->stream_id());
 }
 
 void QuicSocketEntry::OnConnectionClosed(int error_code, bool from_remote)

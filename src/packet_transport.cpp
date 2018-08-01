@@ -2,15 +2,15 @@
 
 namespace posix_quic {
 
-void Set(std::shared_ptr<int> udpSocket, QuicSocketAddress const& address)
+void PosixQuicPacketTransport::Set(std::shared_ptr<int> udpSocket, QuicSocketAddress const& address)
 {
     udpSocket_ = udpSocket;
     address_ = address;
 }
 
-int Write(const char* buffer, size_t buf_len)
+int PosixQuicPacketTransport::Write(const char* buffer, size_t buf_len)
 {
-    if (!udpSocket || !address_.IsInitialized()) {
+    if (!udpSocket_ || !address_.IsInitialized()) {
         return -1;
     }
 

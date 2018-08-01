@@ -1,4 +1,6 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.5.1)
+
+set(CMAKE_CXX_STANDARD 14)
 
 # Usage by vcpkg (CMAKE_TOOLCHAIN_FILE):
 #   mkdir build && cd build && cmake .. -DCMAKE_TOOLCHAIN_FILE=$CMAKE_TOOLCHAIN_FILE
@@ -19,7 +21,7 @@ message("------------ Options -------------")
 message("  CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 message("  CMAKE_COMMAND: ${CMAKE_COMMAND}")
 
-set(CMAKE_CXX_FLAGS -std=gnu++11)
+#set(CMAKE_CXX_FLAGS -std=gnu++11)
 set(CMAKE_CXX_FLAGS_DEBUG "-g ${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS_RELEASE "-g -O3 ${CMAKE_CXX_FLAGS}")
 

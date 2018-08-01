@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fwd.h"
 #include <unordered_map>
 #include <mutex>
 

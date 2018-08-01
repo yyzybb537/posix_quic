@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fwd.h"
 #include <unordered_map>
 #include <mutex>
 
@@ -31,7 +32,7 @@ public:
         return it2->second;
     }
 
-    QuicSocket GetOnwer(UdpSocket udpSocket) {
+    QuicSocket GetOwner(UdpSocket udpSocket) {
         std::unique_lock<std::mutex> lock(mtx_);
         auto it = owners_.find(udpSocket);
         if (it != owners_.end())

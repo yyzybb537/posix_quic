@@ -1,12 +1,31 @@
 #include "epoller_entry.h"
 #include "clock.h"
 #include "header_parser.h"
+#include "socket_entry.h"
+#include "stream_entry.h"
+#include <sys/socket.h>
+#include <poll.h>
 
 namespace posix_quic {
 
 QuicEpollerEntry::QuicEpollerEntry()
 {
     SetFd(epoll_create(10240));
+}
+
+QuicEpollerEntry::~QuicEpollerEntry()
+{
+    std::unique_lock<std::mutex> lock(mtx_);
+    ::close(Fd());
+    SetFd(-1);
+    udps_.clear();
+    for (auto & kv : fds_) {
+        EntryPtr entry = kv.second.first.lock();
+        if (!entry) continue ;
+
+        entry->StopWait(&trigger_);
+    }
+    fds_.clear();
 }
 
 QuicEpollerEntryPtr QuicEpollerEntry::NewQuicEpollerEntry()
@@ -18,7 +37,11 @@ QuicEpollerEntryPtr QuicEpollerEntry::NewQuicEpollerEntry()
     }
     return QuicEpollerEntryPtr();
 }
-int QuicEpollerEntry::Add(int fd, int events, struct epoll_event * event)
+void QuicEpollerEntry::DeleteQuicEpollerEntry(QuicEpollerEntryPtr ep)
+{
+    GetFdManager().Delete(ep->Fd());
+}
+int QuicEpollerEntry::Add(int fd, struct epoll_event * event)
 {
     std::unique_lock<std::mutex> lock(mtx_);
     auto itr = fds_.find(fd);
@@ -61,7 +84,7 @@ int QuicEpollerEntry::Add(int fd, int events, struct epoll_event * event)
     }
 
     std::shared_ptr<quic_epoll_event> qev(new quic_epoll_event);
-    qev->events = event->events;
+    qev->events = Epoll2Poll(event->events);
     qev->data = event->data;
     qev->revents = 0;
 
@@ -71,7 +94,7 @@ int QuicEpollerEntry::Add(int fd, int events, struct epoll_event * event)
     entry->StartWait(waiter, &trigger_);
     return 0;
 }
-int QuicEpollerEntry::Mod(int fd, int events, struct epoll_event * event)
+int QuicEpollerEntry::Mod(int fd, struct epoll_event * event)
 {
     std::unique_lock<std::mutex> lock(mtx_);
     auto itr = fds_.find(fd);
@@ -81,11 +104,11 @@ int QuicEpollerEntry::Mod(int fd, int events, struct epoll_event * event)
     }
 
     auto & qev = itr->second.second;
-    qev->events = event->events;
+    qev->events = Epoll2Poll(event->events);
     qev->data = event->data;
     return 0;
 }
-int QuicEpollerEntry::Del(int fd, int events)
+int QuicEpollerEntry::Del(int fd)
 {
     std::unique_lock<std::mutex> lock(mtx_);
     auto itr = fds_.find(fd);
@@ -153,8 +176,11 @@ int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeou
                 // 新连接
                 if (!owner) {
                     QuicSocket ownerFd = QuicSocketEntry::GetConnectionManager().GetOwner(udpFd);
-                    if (ownerFd >= 0)
-                        owner = QuicSocketEntry::GetFdManager().Get(ownerFd);
+                    if (ownerFd >= 0) {
+                        EntryPtr ownerBase = QuicSocketEntry::GetFdManager().Get(ownerFd);
+                        assert(ownerBase->Category() == EntryCategory::Socket);
+                        owner = std::dynamic_pointer_cast<QuicSocketEntry>(ownerBase);
+                    }
                 }
 
                 if (!owner) {
@@ -163,21 +189,85 @@ int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeou
                 }
 
                 QuicSocketEntryPtr socket = QuicSocketEntry::NewQuicSocketEntry();
-                socket->OnSyn(onwer);
-                socket->ProcessUdpPacket(GetLocalAddress(udpFd), MakeAddress(&addr, addrLen), QuicClockImpl::getInstance().Now());
+                socket->OnSyn(owner);
+                socket->ProcessUdpPacket(GetLocalAddress(udpFd),
+                        MakeAddress(&addr, addrLen),
+                        QuicReceivedPacket(&udpRecvBuf_[0], bytes, QuicClockImpl::getInstance().Now()));
                 socket->StartCryptoHandshake();
                 continue;
             }
 
-            QuicSocketEntryPtr socket = QuicSocketEntry::GetFdManager().Get(quicSocket);
-            socket->ProcessUdpPacket(GetLocalAddress(udpFd), MakeAddress(&addr, addrLen), QuicClockImpl::getInstance().Now());
+            EntryPtr socket = QuicSocketEntry::GetFdManager().Get(quicSocket);
+            assert(socket->Category() == EntryCategory::Socket);
+
+            ((QuicSocketEntry*)socket.get())->ProcessUdpPacket(GetLocalAddress(udpFd),
+                MakeAddress(&addr, addrLen),
+                QuicReceivedPacket(&udpRecvBuf_[0], bytes, QuicClockImpl::getInstance().Now()));
         }
     }
+
+    std::unique_lock<std::mutex> lock(mtx_);
+    int i = 0;
+    for (auto & kv : fds_) {
+        if (i >= maxevents) break;
+
+        quic_epoll_event & qev = *(kv.second.second);
+        short int event = qev.events;
+
+        short int revents = __atomic_and_fetch(&qev.revents, ~event, std::memory_order_seq_cst);
+        revents &= event;
+
+        if (revents == 0) continue;
+
+        struct epoll_event & ev = events[i++];
+        ev.data = qev.data;
+        ev.events = Poll2Epoll(revents);
+    }
+
+    return i;
 }
 FdManager<QuicEpollerEntryPtr> & QuicEpollerEntry::GetFdManager()
 {
     static FdManager<QuicEpollerEntryPtr> obj;
     return obj;
+}
+
+QuicSocketAddress QuicEpollerEntry::GetLocalAddress(UdpSocket udpSocket)
+{
+    struct sockaddr_in addr;
+    socklen_t addrLen;
+    int res = getsockname(udpSocket, (struct sockaddr*)&addr, &addrLen); 
+    if (res != 0) return QuicSocketAddress();
+    return MakeAddress(&addr, addrLen);
+}
+
+QuicSocketAddress QuicEpollerEntry::MakeAddress(const struct sockaddr_in* addr, socklen_t addrLen)
+{
+    return QuicSocketAddress(*(const struct sockaddr_storage*)addr);
+}
+
+short int Epoll2Poll(uint32_t event)
+{
+    short int ev = 0;
+    if (event & EPOLLIN)
+        ev |= POLLIN;
+    if (event & EPOLLOUT)
+        ev |= POLLOUT;
+    if (event & EPOLLERR)
+        ev |= POLLERR;
+    return ev;
+}
+
+uint32_t Poll2Epoll(short int event)
+{
+    uint32_t ev = 0;
+    if (event & POLLIN)
+        ev |= EPOLLIN;
+    if (event & POLLOUT)
+        ev |= EPOLLOUT;
+    if (event & POLLERR)
+        ev |= EPOLLERR;
+    return ev;
 }
 
 } // namespace posix_quic

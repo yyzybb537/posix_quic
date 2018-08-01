@@ -1,13 +1,14 @@
 #include "event.h"
 #include <chrono>
 #include <atomic>
+#include <poll.h>
 
 namespace posix_quic {
 
 void Event::EventTrigger::Wait(int timeout)
 {
     std::unique_lock<std::mutex> lock(cvMtx);
-    if (trigger) return ;
+    if (triggered) return ;
     if (timeout > 0) {
         cv.wait_for(lock, std::chrono::milliseconds(timeout));
     } else if (timeout == 0) {
@@ -20,7 +21,7 @@ void Event::EventTrigger::Wait(int timeout)
 void Event::EventTrigger::Trigger()
 {
     std::unique_lock<std::mutex> lock(cvMtx);
-    trigger = true;
+    triggered = true;
     cv.notify_one();
 }
 
@@ -46,20 +47,20 @@ void Event::Trigger(int event)
         switch (event) {
             case POLLIN:
                 if (*waiter.events & POLLIN) {
-                    std::__atomic_or_fetch(waiter.revents, POLLIN, std::memory_order_seq_cst);
+                    __atomic_or_fetch(waiter.revents, POLLIN, std::memory_order_seq_cst);
                     trigger->Trigger();
                 }
                 break;
 
             case POLLOUT:
                 if (*waiter.events & POLLOUT) {
-                    std::__atomic_or_fetch(waiter.revents, POLLOUT, std::memory_order_seq_cst);
+                    __atomic_or_fetch(waiter.revents, POLLOUT, std::memory_order_seq_cst);
                     trigger->Trigger();
                 }
                 break;
 
             case POLLERR:
-                std::__atomic_or_fetch(waiter.revents, POLLERR, std::memory_order_seq_cst);
+                __atomic_or_fetch(waiter.revents, POLLERR, std::memory_order_seq_cst);
                 trigger->Trigger();
                 break;
 
@@ -85,11 +86,11 @@ void Event::SetWritable(bool b)
     writable = b;
     Trigger(POLLOUT);
 }
-void Event::SetError(int err, int quicErr = 0)
+void Event::SetError(int err, int quicErr)
 {
     if (error == 0) {
         error = err;
-        quicErrorCode = quicErr;
+        quicErrorCode = (QuicErrorCode)quicErr;
         Trigger(POLLERR);
     }
 }

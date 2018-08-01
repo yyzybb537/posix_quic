@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fwd.h"
 #include <memory>
 #include <mutex>
 #include <condition_variable>
@@ -12,9 +13,12 @@ class Event
 public:
     virtual ~Event() {}
 
+    void SetFd(int fd) { fd_ = fd; }
+    int Fd() const { return fd_; }
+
     struct EventWaiter {
-        int* events;
-        int* revents;
+        short int* events;
+        short int* revents;
     };
 
     struct EventTrigger {
@@ -46,8 +50,10 @@ private:
     bool readable = false;
     bool writable = false;
     bool closeByPeer = false;
-    QuicErrorCode quicErrorCode = QUIC_NO_ERROR;
+    QuicErrorCode quicErrorCode = net::QUIC_NO_ERROR;
     int error = 0;
+
+    int fd_ = 0;
 
     std::mutex mtx_;
     std::map<EventTrigger*, EventWaiter> waitings_;

@@ -2,17 +2,25 @@
 
 namespace posix_quic {
 
-QuicStreamEntry::QuicStreamEntry()
+QuicStreamEntry::QuicStreamEntry(QuicSocketEntryPtr socketEntry, QuicStreamId streamId)
 {
+    udpSocket_ = socketEntry->NativeUdpFd();
+    socketEntry_ = socketEntry;
+    streamId_ = streamId;
     auto stream = GetQuartcStream();
     if (stream)
         stream->SetDelegate(this);
 }
 
+std::shared_ptr<int> QuicStreamEntry::NativeUdpFd() const
+{
+    return udpSocket_;
+}
+
 ssize_t QuicStreamEntry::Writev(const struct iovec* iov, size_t iov_count, bool fin)
 {
-    if (error) {
-        errno = error;
+    if (Error()) {
+        errno = Error();
         return -1;
     }
 
@@ -33,8 +41,8 @@ ssize_t QuicStreamEntry::Writev(const struct iovec* iov, size_t iov_count, bool 
 
 ssize_t QuicStreamEntry::Readv(const struct iovec* iov, size_t iov_count)
 {
-    if (error) {
-        errno = error;
+    if (Error()) {
+        errno = Error();
         return -1;
     }
 
@@ -93,17 +101,17 @@ void QuicStreamEntry::DeleteQuicStream(QuicStreamEntryPtr const& ptr)
     }
 }
 
-void QuicStreamEntry::OnDataAvailable() override
+void QuicStreamEntry::OnDataAvailable(QuartcStreamInterface* stream)
 {
     SetReadable(true);
 }
 
-void QuicStreamEntry::OnClose(QuartcStreamInterface* stream) override
+void QuicStreamEntry::OnClose(QuartcStreamInterface* stream)
 {
     SetError(EBADF);
 }
 
-void QuicStreamEntry::OnCanWriteNewData() override
+void QuicStreamEntry::OnCanWriteNewData(QuartcStreamInterface* stream)
 {
     SetWritable(true);
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fwd.h"
 #include "net/quic/quartc/quartc_clock_interface.h"
 
 namespace posix_quic {

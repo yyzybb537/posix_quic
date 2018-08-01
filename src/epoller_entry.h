@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fwd.h"
 #include <unordered_map>
 #include <mutex>
 #include "entry.h"
@@ -7,11 +8,13 @@
 
 namespace posix_quic {
 
-class QuicEpollerEntry : public EntryBase
+class QuicEpollerEntry : public Event
 {
 public:
-    struct quic_epoll_event : public epoll_event {
-        uint32_t revents;
+    struct quic_epoll_event {
+        short int events;
+        short int revents;
+        epoll_data_t data;
     };
 
     typedef std::unordered_map<
@@ -25,22 +28,29 @@ public:
     QuicEpollerEntry();
     ~QuicEpollerEntry();
 
+    static FdManager<QuicEpollerEntryPtr> & GetFdManager();
+
     static QuicEpollerEntryPtr NewQuicEpollerEntry();
 
-    int Add(int fd, int events, struct epoll_event *event);
+    static void DeleteQuicEpollerEntry(QuicEpollerEntryPtr ep);
 
-    int Mod(int fd, int events, struct epoll_event *event);
+    int Add(int fd, struct epoll_event *event);
 
-    int Del(int fd, int events);
+    int Mod(int fd, struct epoll_event *event);
+
+    int Del(int fd);
 
     int Wait(struct epoll_event *events, int maxevents, int timeout);
 
 protected:
-    FdManager<QuicEpollerEntryPtr> & GetFdManager();
-
     QuicSocketAddress GetLocalAddress(UdpSocket udpSocket);
 
-    QuicSocketAddress MakeAddress(struct sockaddr_in* addr, socklen_t addrLen);
+    QuicSocketAddress MakeAddress(const struct sockaddr_in* addr, socklen_t addrLen);
+
+    short int Epoll2Poll(uint32_t event);
+
+    uint32_t Poll2Epoll(short int event);
+
 
 private:
     std::mutex mtx_;

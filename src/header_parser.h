@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fwd.h"
 #include "net/quic/core/quic_framer.h"
 #include <mutex>
 

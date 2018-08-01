@@ -1,9 +1,11 @@
 #pragma once
 
+#include "fwd.h"
 #include "net/quic/quartc/quartc_session.h"
 #include "net/quic/quartc/quartc_stream_interface.h"
 #include "event.h"
-#include "fwd.h"
+#include "fd_factory.h"
+#include "fd_manager.h"
 
 namespace posix_quic {
 
@@ -14,22 +16,21 @@ typedef std::weak_ptr<EntryBase> EntryWeakPtr;
 enum class EntryCategory : int8_t {
     Socket,
     Stream,
+    Epoll,
 };
 
 class EntryBase : public Event
 {
 public:
-    void SetFd(int fd) { fd_ = fd; }
-    int Fd() const { return fd_; }
-
     virtual EntryCategory Category() const = 0;
 
-protected:
-    static FdFactory & GetFdFactory();
-    static FdManager<EntryPtr> & GetFdManager();
+    virtual std::shared_ptr<int> NativeUdpFd() const = 0;
 
-private:
-    int fd_ = 0;
+    virtual int Close() = 0;
+
+    static FdFactory & GetFdFactory();
+
+    static FdManager<EntryPtr> & GetFdManager();
 };
 
 } // namespace posix_quic
