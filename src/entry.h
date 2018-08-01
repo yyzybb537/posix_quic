@@ -14,9 +14,9 @@ typedef std::shared_ptr<EntryBase> EntryPtr;
 typedef std::weak_ptr<EntryBase> EntryWeakPtr;
 
 enum class EntryCategory : int8_t {
+    Invalid,
     Socket,
     Stream,
-    Epoll,
 };
 
 class EntryBase : public Event

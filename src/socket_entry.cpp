@@ -259,6 +259,7 @@ void QuicSocketEntry::PushAcceptQueue(QuicSocketEntryPtr entry)
 {
     std::unique_lock<std::mutex> lock(acceptQueueMtx_);
     acceptQueue_.push(entry);
+    SetReadable(true);
 }
 
 void QuicSocketEntry::OnSyn(QuicSocketEntryPtr owner)

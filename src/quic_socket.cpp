@@ -53,6 +53,24 @@ int QuicConnect(QuicSocket sock, const struct sockaddr* addr, socklen_t addrlen)
     return ((QuicSocketEntry*)socket.get())->Connect(addr, addrlen);
 }
 
+bool IsConnected(QuicSocket sock)
+{
+    auto socket = EntryBase::GetFdManager().Get(sock);
+    if (!socket || socket->Category() != EntryCategory::Socket) {
+        errno = EBADF;
+        return -1;
+    }
+
+    return ((QuicSocketEntry*)socket.get())->IsConnected();
+}
+
+EntryCategory GetCategory(int fd)
+{
+    auto socket = EntryBase::GetFdManager().Get(fd);
+    if (!socket) return EntryCategory::Invalid;
+    return socket->Category();
+}
+
 QuicSocket QuicSocketAccept(QuicSocket listenSock, const struct sockaddr* addr, socklen_t & addrlen)
 {
     auto socket = EntryBase::GetFdManager().Get(listenSock);
@@ -120,6 +138,14 @@ ssize_t QuicWritev(QuicStream stream, const struct iovec* iov, int iov_count, bo
     return ((QuicStreamEntry*)streamPtr.get())->Writev(iov, iov_count, fin);
 }
 
+ssize_t QuicWrite(QuicStream stream, const void* data, size_t length, bool fin)
+{
+    struct iovec iov;
+    iov.iov_base = (void*)data;
+    iov.iov_len = length;
+    return QuicWritev(stream, &iov, 1, fin);
+}
+
 ssize_t QuicReadv(QuicStream stream, const struct iovec* iov, int iov_count)
 {
     auto streamPtr = EntryBase::GetFdManager().Get(stream);
@@ -129,6 +155,14 @@ ssize_t QuicReadv(QuicStream stream, const struct iovec* iov, int iov_count)
     }
 
     return ((QuicStreamEntry*)streamPtr.get())->Readv(iov, iov_count);
+}
+
+ssize_t QuicRead(QuicStream stream, void* data, size_t length)
+{
+    struct iovec iov;
+    iov.iov_base = data;
+    iov.iov_len = length;
+    return QuicReadv(stream, &iov, 1);
 }
 
 // poll

@@ -13,6 +13,7 @@
 #include "fwd.h"
 #include <memory>
 #include <poll.h>
+#include "entry.h"
 
 namespace posix_quic {
 
@@ -30,6 +31,10 @@ int QuicListen(QuicSocket sock, int backlog);
 
 int QuicConnect(QuicSocket sock, const struct sockaddr* addr, socklen_t addrlen);
 
+bool IsConnected(QuicSocket sock);
+
+EntryCategory GetCategory(int fd);
+
 QuicSocket QuicSocketAccept(QuicSocket listenSock, const struct sockaddr* addr, socklen_t & addrlen);
 
 QuicStream QuicStreamAccept(QuicSocket sock);
@@ -42,6 +47,10 @@ ssize_t QuicWritev(QuicStream stream, const struct iovec* iov, int iov_count,
         bool fin);
 
 ssize_t QuicReadv(QuicStream stream, const struct iovec* iov, int iov_count);
+
+ssize_t QuicWrite(QuicStream stream, const void* data, size_t length, bool fin);
+
+ssize_t QuicRead(QuicStream stream, void* data, size_t length);
 
 // poll
 int QuicPoll(struct pollfd *fds, nfds_t nfds, int timeout);
