@@ -30,7 +30,6 @@ message("------------------------------------")
 
 # source
 aux_source_directory(${PROJECT_SOURCE_DIR}/src LIST_SRC)
-add_executable(${TARGET} ${LIST_SRC})
 
 # include
 include_directories(${PROJECT_SOURCE_DIR}/../../src)
@@ -40,6 +39,11 @@ include_directories(${PROJECT_SOURCE_DIR}/../../libquic/third_party/protobuf/src
 
 link_directories(${PROJECT_SOURCE_DIR}/../../build)
 link_directories(${PROJECT_SOURCE_DIR}/../../build/libquic)
+link_directories(${PROJECT_SOURCE_DIR}/../../build/libquic/third_party/boringssl/src/ssl)
+link_directories(${PROJECT_SOURCE_DIR}/../../build/libquic/third_party/boringssl/src/crypto)
+link_directories(${PROJECT_SOURCE_DIR}/../../build/libquic/third_party/boringssl/src/decrepit)
+link_directories(${PROJECT_SOURCE_DIR}/../../build/libquic/third_party/protobuf/src)
 
 # target
-target_link_libraries(${TARGET} posix_quic quic -pthread -ldl -static)
+add_executable(${TARGET} ${LIST_SRC})
+target_link_libraries(${TARGET} posix_quic quic ssl crypto decrepit protobuf -pthread dl -static)

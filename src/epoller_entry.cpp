@@ -246,7 +246,7 @@ QuicSocketAddress QuicEpollerEntry::MakeAddress(const struct sockaddr_in* addr, 
     return QuicSocketAddress(*(const struct sockaddr_storage*)addr);
 }
 
-short int Epoll2Poll(uint32_t event)
+short int QuicEpollerEntry::Epoll2Poll(uint32_t event)
 {
     short int ev = 0;
     if (event & EPOLLIN)
@@ -258,7 +258,7 @@ short int Epoll2Poll(uint32_t event)
     return ev;
 }
 
-uint32_t Poll2Epoll(short int event)
+uint32_t QuicEpollerEntry::Poll2Epoll(short int event)
 {
     uint32_t ev = 0;
     if (event & POLLIN)

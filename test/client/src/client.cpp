@@ -2,6 +2,13 @@
 #include <string.h>
 #include <stdio.h>
 #include <string>
+#include <sys/epoll.h>
+#include <sys/poll.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+using namespace posix_quic;
 
 #define CHECK_RES(res, api) \
     do {\
@@ -52,9 +59,11 @@ int doLoop(QuicEpoller ep) {
 
                 printf("recv(len=%d): %.*s\n", res, res, buf);
 
-                std::string s = "Bye";
-                res = QuicWrite(stream, s.c_str(), s.size(), true);
-                CHECK_RES(res, "write");
+                if (std::string(buf, res) != "Bye") {
+                    std::string s = "Bye";
+                    res = QuicWrite(fd, s.c_str(), s.size(), true);
+                    CHECK_RES(res, "write");
+                }
             }
         }
     }

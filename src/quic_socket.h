@@ -13,6 +13,7 @@
 #include "fwd.h"
 #include <memory>
 #include <poll.h>
+#include <sys/epoll.h>
 #include "entry.h"
 
 namespace posix_quic {
