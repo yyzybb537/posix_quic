@@ -1,8 +1,17 @@
 #pragma once
 
 #include <memory>
+#include "net/quic/quartc/quartc_session.h"
 
 namespace posix_quic {
+
+// uint64_t
+using net::QuicConnectionId;
+
+// uint32_t
+using net::QuicStreamId;
+
+#define INVALID_QUIC_CONNECTION_ID QuicConnectionId(-1)
 
 typedef int UdpSocket;
 typedef int QuicSocket;

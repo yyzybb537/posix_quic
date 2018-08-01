@@ -3,12 +3,9 @@
 #include "net/quic/quartc/quartc_session.h"
 #include "net/quic/quartc/quartc_stream_interface.h"
 #include "event.h"
+#include "fwd.h"
 
 namespace posix_quic {
-
-// uint64_t
-using net::QuicConnectionId;
-using net::QuicStreamId;
 
 class EntryBase;
 typedef std::shared_ptr<EntryBase> EntryPtr;

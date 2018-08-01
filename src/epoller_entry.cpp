@@ -1,5 +1,6 @@
 #include "epoller_entry.h"
 #include "clock.h"
+#include "header_parser.h"
 
 namespace posix_quic {
 
@@ -140,6 +141,11 @@ int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeou
             if (bytes < 0) break;
 
             // 1.解析quic framer
+            QuicConnectionId connectionId = HeaderParser::ParseHeader(&udpRecvBuf_[0], bytes);
+            if (connectionId == INVALID_QUIC_CONNECTION_ID) {
+                // 不是quic包, 直接丢弃
+                continue;
+            }
 
             // 2.根据ConnectionId来分派, 给指定的QuicSocket
             QuicSocket quicSocket = QuicSocketEntry::GetConnectionManager().Get(udpFd, connectionId);
