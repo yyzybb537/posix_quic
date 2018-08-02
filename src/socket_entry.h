@@ -114,7 +114,7 @@ private:
 
     // accept stream queue
     std::mutex streamQueueMtx_;
-    std::queue<QuicStreamId> streamQueue_;
+    std::queue<QuicStreamEntryPtr> streamQueue_;
 
     std::shared_ptr<PosixQuicPacketTransport> packetTransport_;
 };

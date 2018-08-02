@@ -31,6 +31,8 @@ public:
     static FdFactory & GetFdFactory();
 
     static FdManager<EntryPtr> & GetFdManager();
+
+    const char* DebugTypeInfo() override { return EntryCategory2Str((int)Category()); };
 };
 
 } // namespace posix_quic

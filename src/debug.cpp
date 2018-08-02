@@ -139,5 +139,18 @@ const char* EntryCategory2Str(int category)
     }
 }
 
+const char* Perspective2Str(int perspective)
+{
+    switch (perspective) {
+        case (int)net::Perspective::IS_CLIENT:
+            return "IS_CLIENT";
+
+        case (int)net::Perspective::IS_SERVER:
+            return "IS_SERVER";
+
+        default:
+            return "Unkown";
+    }
+}
 
 } // namespace posix_quic

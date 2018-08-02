@@ -47,7 +47,7 @@ void Event::Trigger(int event)
         switch (event) {
             case POLLIN:
                 if (*waiter.events & POLLIN) {
-                    __atomic_or_fetch(waiter.revents, POLLIN, std::memory_order_seq_cst);
+                    __atomic_fetch_or(waiter.revents, POLLIN, std::memory_order_seq_cst);
                     trigger->Trigger();
                     DebugPrint(dbg_event, "fd = %d, trigger event = POLLIN. waiter.revents = %s", Fd(), PollEvent2Str(*waiter.revents));
                 }
@@ -55,14 +55,14 @@ void Event::Trigger(int event)
 
             case POLLOUT:
                 if (*waiter.events & POLLOUT) {
-                    __atomic_or_fetch(waiter.revents, POLLOUT, std::memory_order_seq_cst);
+                    __atomic_fetch_or(waiter.revents, POLLOUT, std::memory_order_seq_cst);
                     trigger->Trigger();
                     DebugPrint(dbg_event, "fd = %d, trigger event = POLLOUT. waiter.revents = %s", Fd(), PollEvent2Str(*waiter.revents));
                 }
                 break;
 
             case POLLERR:
-                __atomic_or_fetch(waiter.revents, POLLERR, std::memory_order_seq_cst);
+                __atomic_fetch_or(waiter.revents, POLLERR, std::memory_order_seq_cst);
                 trigger->Trigger();
                 DebugPrint(dbg_event, "fd = %d, trigger event = POLLERR. waiter.revents = %s", Fd(), PollEvent2Str(*waiter.revents));
                 break;

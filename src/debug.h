@@ -17,6 +17,7 @@ enum eDbgMask {
     dbg_api         = 0x1 << 6,
     dbg_ignore      = 0x1 << 7,
     dbg_event       = 0x1 << 8,
+    dbg_fd          = 0x1 << 9,
     dbg_user        = 0x1 << 31,
     dbg_all         = 0xffffffff,
 };
@@ -43,6 +44,7 @@ const char* PollEvent2Str(short int event);
 const char* EpollEvent2Str(uint32_t event);
 const char* EpollOp2Str(int op);
 const char* EntryCategory2Str(int category);
+const char* Perspective2Str(int perspective);
 
 #define DebugPrint(type, fmt, ...) \
     do { \

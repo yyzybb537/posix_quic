@@ -114,7 +114,12 @@ int QuicSocketEntry::Bind(const struct sockaddr* addr, socklen_t addrlen)
             }
 
         case QuicSocketState_Inited:
-            return ::bind(*udpSocket_, addr, addrlen);
+            {
+               int res = ::bind(*udpSocket_, addr, addrlen);
+               if (res == 0)
+                   socketState_ = QuicSocketState_Binded;
+               return res;
+            }
 
         default:
             errno = EINVAL;
@@ -192,13 +197,9 @@ QuicStreamEntryPtr QuicSocketEntry::AcceptStream()
 
     std::unique_lock<std::mutex> lock(streamQueueMtx_);
     while (!streamQueue_.empty()) {
-        QuicStreamId id = streamQueue_.front();
+        QuicStreamEntryPtr stream = streamQueue_.front();
         streamQueue_.pop();
-
-        if (IsClosedStream(id))
-            continue;
-
-        return QuicStreamEntry::NewQuicStream(shared_from_this(), id);
+        return stream;
     }
 
     errno = EAGAIN;
@@ -213,9 +214,8 @@ QuicStreamEntryPtr QuicSocketEntry::CreateStream()
     }
 
     std::unique_lock<std::mutex> lock(mtx_);
-    QuicStreamId id = GetNextOutgoingStreamId();
-    GetOrCreateStream(id);
-    return QuicStreamEntry::NewQuicStream(shared_from_this(), id);
+    QuartcStream* stream = CreateOutgoingDynamicStream();
+    return QuicStreamEntry::NewQuicStream(shared_from_this(), stream);
 }
 
 QuartcStreamPtr QuicSocketEntry::GetQuartcStream(QuicStreamId streamId)
@@ -258,6 +258,7 @@ std::shared_ptr<int> QuicSocketEntry::NativeUdpFd() const
 
 void QuicSocketEntry::PushAcceptQueue(QuicSocketEntryPtr entry)
 {
+    DebugPrint(dbg_accept, "this->fd = %d, newSocket->fd = %d", Fd(), entry->Fd());
     std::unique_lock<std::mutex> lock(acceptQueueMtx_);
     acceptQueue_.push(entry);
     SetReadable(true);
@@ -277,7 +278,8 @@ void QuicSocketEntry::OnSyn(QuicSocketEntryPtr owner, QuicSocketAddress address)
 void QuicSocketEntry::OnCryptoHandshakeComplete()
 {
     socketState_ = QuicSocketState_Connected;
-    DebugPrint(dbg_connect | dbg_accept, "-> fd = %d, OnCryptoHandshakeComplete", Fd());
+    DebugPrint(dbg_connect | dbg_accept, "-> fd = %d, OnCryptoHandshakeComplete %s", 
+            Fd(), Perspective2Str((int)perspective()));
     SetWritable(true);
     if (perspective() == Perspective::IS_SERVER) {
         // push to owner accept queue.
@@ -292,7 +294,10 @@ void QuicSocketEntry::OnCryptoHandshakeComplete()
 
 void QuicSocketEntry::OnIncomingStream(QuartcStreamInterface* stream)
 {
-    streamQueue_.push(stream->stream_id());
+    QuicStreamEntryPtr streamPtr = QuicStreamEntry::NewQuicStream(shared_from_this(), stream);
+    std::unique_lock<std::mutex> lock(streamQueueMtx_);
+    streamQueue_.push(streamPtr);
+    SetReadable(true);
 }
 
 void QuicSocketEntry::OnConnectionClosed(int error_code, bool from_remote)

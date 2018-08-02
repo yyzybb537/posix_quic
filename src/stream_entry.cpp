@@ -2,14 +2,12 @@
 
 namespace posix_quic {
 
-QuicStreamEntry::QuicStreamEntry(QuicSocketEntryPtr socketEntry, QuicStreamId streamId)
+QuicStreamEntry::QuicStreamEntry(QuicSocketEntryPtr socketEntry, QuartcStreamInterface* stream)
 {
     udpSocket_ = socketEntry->NativeUdpFd();
     socketEntry_ = socketEntry;
-    streamId_ = streamId;
-    auto stream = GetQuartcStream();
-    if (stream)
-        stream->SetDelegate(this);
+    streamId_ = stream->stream_id();
+    stream->SetDelegate(this);
 }
 
 std::shared_ptr<int> QuicStreamEntry::NativeUdpFd() const
@@ -20,12 +18,14 @@ std::shared_ptr<int> QuicStreamEntry::NativeUdpFd() const
 ssize_t QuicStreamEntry::Writev(const struct iovec* iov, size_t iov_count, bool fin)
 {
     if (Error()) {
+        DebugPrint(dbg_write, "stream = %d, Has error = %d", Fd(), Error());
         errno = Error();
         return -1;
     }
 
     auto stream = GetQuartcStream();
     if (!stream) {
+        DebugPrint(dbg_write, "stream = %d, GetQuartcStream returns nullptr", Fd());
         errno = EBADF;
         return -1;
     }

@@ -43,6 +43,8 @@ public:
 
     int Wait(struct epoll_event *events, int maxevents, int timeout);
 
+    const char* DebugTypeInfo() override { return "Epoll"; };
+
 protected:
     QuicSocketAddress GetLocalAddress(UdpSocket udpSocket);
 
@@ -50,6 +52,7 @@ protected:
 
     uint32_t Poll2Epoll(short int event);
 
+    int Poll(struct epoll_event *events, int maxevents);
 
 private:
     std::mutex mtx_;

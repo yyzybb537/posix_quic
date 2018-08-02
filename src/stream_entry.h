@@ -15,7 +15,7 @@ class QuicStreamEntry
     private QuartcStreamInterface::Delegate
 {
 public:
-    QuicStreamEntry(QuicSocketEntryPtr socketEntry, QuicStreamId streamId);
+    QuicStreamEntry(QuicSocketEntryPtr socketEntry, QuartcStreamInterface* stream);
 
     EntryCategory Category() const override { return EntryCategory::Stream; }
 

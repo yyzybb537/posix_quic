@@ -13,6 +13,7 @@ public:
     void Put(int fd, Entry const& entry) {
         std::unique_lock<std::mutex> lock(mtx_);
         map_[fd] = entry;
+        DebugPrint(dbg_fd, "Put %s fd = %d", entry->DebugTypeInfo(), fd);
     }
 
     Entry Get(int fd) {
@@ -24,7 +25,12 @@ public:
 
     bool Delete(int fd) {
         std::unique_lock<std::mutex> lock(mtx_);
-        return map_.erase(fd) > 0;
+        auto iter = map_.find(fd);
+        if (iter == map_.end()) return false;
+        Entry & entry = iter->second;
+        DebugPrint(dbg_fd, "Del %s fd = %d", entry->DebugTypeInfo(), fd);
+        map_.erase(iter);
+        return true;
     }
 
 private:

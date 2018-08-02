@@ -145,8 +145,11 @@ int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeou
 {
     udpEvents_.resize((std::max<size_t>)(udps_.size(), 1));
     udpRecvBuf_.resize(65 * 1024);
+    
+    int res = Poll(events, maxevents);
+    if (res > 0) return res;
 
-    int res = epoll_wait(Fd(), &udpEvents_[0], udpEvents_.size(), timeout);
+    res = epoll_wait(Fd(), &udpEvents_[0], udpEvents_.size(), timeout);
     if (res < 0) {
         return res;
     }
@@ -224,6 +227,10 @@ int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeou
         }
     }
 
+    return Poll(events, maxevents);
+}
+int QuicEpollerEntry::Poll(struct epoll_event *events, int maxevents)
+{
     std::unique_lock<std::mutex> lock(mtx_);
     int i = 0;
     for (auto & kv : fds_) {
@@ -232,8 +239,14 @@ int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeou
         quic_epoll_event & qev = *(kv.second.second);
         short int event = qev.events;
 
-        short int revents = __atomic_and_fetch(&qev.revents, ~event, std::memory_order_seq_cst);
+//        DebugPrint(dbg_event, "fd = %d, qev.revents = %s, event = %s",
+//                kv.first, PollEvent2Str(qev.revents), PollEvent2Str(event));
+
+        short int revents = __atomic_fetch_and(&qev.revents, ~event, std::memory_order_seq_cst);
         revents &= event;
+
+//        DebugPrint(dbg_event, "after __atomic_fetch_and fd = %d, qev.revents = %s, revents = %s",
+//                kv.first, PollEvent2Str(qev.revents), PollEvent2Str(revents));
 
         if (revents == 0) continue;
 

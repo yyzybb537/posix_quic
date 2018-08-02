@@ -46,6 +46,8 @@ public:
     bool IsCloseByPeer() { return closeByPeer; }
     QuicErrorCode GetQuicErrorCode() { return quicErrorCode; }
 
+    virtual const char* DebugTypeInfo() { return ""; };
+
 private:
     bool readable = false;
     bool writable = false;
