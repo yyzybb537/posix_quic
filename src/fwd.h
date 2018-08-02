@@ -5,6 +5,7 @@
 #include "net/quic/quartc/quartc_session_interface.h"
 #include "net/quic/quartc/quartc_factory.h"
 #include "net/quic/quartc/quartc_task_runner_interface.h"
+#include "debug.h"
 
 namespace posix_quic {
 
@@ -23,6 +24,10 @@ using QuartcFactory = net::QuartcFactory;
 using QuicTime = net::QuicTime;
 using QuartcTaskRunnerInterface = net::QuartcTaskRunnerInterface;
 using QuicConsumedData = net::QuicConsumedData;
+using QuicFramer = net::QuicFramer;
+using QuicFramerVisitorInterface = net::QuicFramerVisitorInterface;
+using QuicPacketHeader = net::QuicPacketHeader;
+using QuicEncryptedPacket = net::QuicEncryptedPacket;
 
 typedef int UdpSocket;
 typedef int QuicSocket;

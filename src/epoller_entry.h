@@ -5,6 +5,7 @@
 #include <mutex>
 #include "entry.h"
 #include <sys/epoll.h>
+#include "header_parser.h"
 
 namespace posix_quic {
 
@@ -45,8 +46,6 @@ public:
 protected:
     QuicSocketAddress GetLocalAddress(UdpSocket udpSocket);
 
-    QuicSocketAddress MakeAddress(const struct sockaddr_in* addr, socklen_t addrLen);
-
     short int Epoll2Poll(uint32_t event);
 
     uint32_t Poll2Epoll(short int event);
@@ -59,6 +58,7 @@ private:
     std::vector<struct epoll_event> udpEvents_;
     std::vector<char> udpRecvBuf_;
     Event::EventTrigger trigger_;
+    HeaderParser headerParser_;
 };
 
 } // namespace posix_quic

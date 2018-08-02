@@ -5,6 +5,7 @@
  * QuicStream负责数据读写相关, QuicSocket和QuicStream都要使用QuicPoll和
  * QuicEpoller监听.
  *   2.quic socket只有非阻塞模式, 而且必须搭配QuicEpoller使用, 不能独立使用!
+ *   3.QuicEpoller暂时只支持ET模式.
  *
  *
 */
@@ -36,7 +37,7 @@ bool IsConnected(QuicSocket sock);
 
 EntryCategory GetCategory(int fd);
 
-QuicSocket QuicSocketAccept(QuicSocket listenSock, const struct sockaddr* addr, socklen_t & addrlen);
+QuicSocket QuicSocketAccept(QuicSocket listenSock);
 
 QuicStream QuicStreamAccept(QuicSocket sock);
 

@@ -72,8 +72,6 @@ public:
 
     // --------------------------------
     // Called in epoll trigger loop
-    void OnCanWrite() override;
-
     void ProcessUdpPacket(const QuicSocketAddress& self_address,
             const QuicSocketAddress& peer_address,
             const QuicReceivedPacket& packet) override;
@@ -82,13 +80,12 @@ public:
     QuartcStreamPtr GetQuartcStream(QuicStreamId streamId);
 
     static QuartcFactory& GetQuartcFactory();
-    static QuicSocketEntryPtr NewQuicSocketEntry();
-    static QuicSocketEntryPtr NewQuicSocketEntry(QuicConnectionId id);
+    static QuicSocketEntryPtr NewQuicSocketEntry(bool isServer, QuicConnectionId id = INVALID_QUIC_CONNECTION_ID);
     static void DeleteQuicSocketEntry(QuicSocketEntryPtr ptr);
 
     static ConnectionManager & GetConnectionManager();
 
-    void OnSyn(QuicSocketEntryPtr owner);
+    void OnSyn(QuicSocketEntryPtr owner, QuicSocketAddress address);
 
     // -----------------------------------------------------------------
     // QuartcSessionInterface::Delegate

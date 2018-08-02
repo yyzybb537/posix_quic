@@ -7,7 +7,8 @@ namespace posix_quic {
 
 QuicSocket QuicCreateSocket()
 {
-    auto socket = QuicSocketEntry::NewQuicSocketEntry();
+    auto socket = QuicSocketEntry::NewQuicSocketEntry(false);
+    DebugPrint(dbg_api, "socket fd = %d", socket->Fd());
     return socket->Fd();
 }
 
@@ -15,6 +16,7 @@ int QuicCloseSocket(QuicSocket sock)
 {
     EntryPtr entry = EntryBase::GetFdManager().Get(sock);
     if (!entry || entry->Category() != EntryCategory::Socket) {
+        DebugPrint(dbg_api, "sock = %d, return = -1, errno = EBADF", sock);
         errno = EBADF;
         return -1;
     }
@@ -22,6 +24,7 @@ int QuicCloseSocket(QuicSocket sock)
     auto socket = std::dynamic_pointer_cast<QuicSocketEntry>(entry);
     socket->Close();
     QuicSocketEntry::DeleteQuicSocketEntry(socket);
+    DebugPrint(dbg_api, "sock = %d, return = 0", sock);
     return 0;
 }
 
@@ -29,16 +32,20 @@ int QuicBind(QuicSocket sock, const struct sockaddr* addr, socklen_t addrlen)
 {
     auto socket = EntryBase::GetFdManager().Get(sock);
     if (!socket || socket->Category() != EntryCategory::Socket) {
+        DebugPrint(dbg_api, "sock = %d, return = -1, errno = EBADF", sock);
         errno = EBADF;
         return -1;
     }
 
-    return ((QuicSocketEntry*)socket.get())->Bind(addr, addrlen);
+    int res = ((QuicSocketEntry*)socket.get())->Bind(addr, addrlen);
+    DebugPrint(dbg_api, "sock = %d, return = %d, errno = %d", sock, res, errno);
+    return res;
 }
 
 int QuicListen(QuicSocket sock, int backlog)
 {
     // TODO: limit acceptQueue size.
+    DebugPrint(dbg_api, "sock = %d, backlog = %d", sock, backlog);
     return 0;
 }
 
@@ -46,22 +53,28 @@ int QuicConnect(QuicSocket sock, const struct sockaddr* addr, socklen_t addrlen)
 {
     auto socket = EntryBase::GetFdManager().Get(sock);
     if (!socket || socket->Category() != EntryCategory::Socket) {
+        DebugPrint(dbg_api, "sock = %d, return = -1, errno = EBADF", sock);
         errno = EBADF;
         return -1;
     }
 
-    return ((QuicSocketEntry*)socket.get())->Connect(addr, addrlen);
+    int res = ((QuicSocketEntry*)socket.get())->Connect(addr, addrlen);
+    DebugPrint(dbg_api, "sock = %d, return = %d, errno = %d", sock, res, errno);
+    return res;
 }
 
 bool IsConnected(QuicSocket sock)
 {
     auto socket = EntryBase::GetFdManager().Get(sock);
     if (!socket || socket->Category() != EntryCategory::Socket) {
+        DebugPrint(dbg_api, "sock = %d, return = -1, errno = EBADF", sock);
         errno = EBADF;
         return -1;
     }
 
-    return ((QuicSocketEntry*)socket.get())->IsConnected();
+    bool res = ((QuicSocketEntry*)socket.get())->IsConnected();
+    DebugPrint(dbg_api, "sock = %d, return = %d, errno = %d", sock, res, errno);
+    return res;
 }
 
 EntryCategory GetCategory(int fd)
@@ -71,17 +84,22 @@ EntryCategory GetCategory(int fd)
     return socket->Category();
 }
 
-QuicSocket QuicSocketAccept(QuicSocket listenSock, const struct sockaddr* addr, socklen_t & addrlen)
+QuicSocket QuicSocketAccept(QuicSocket listenSock)
 {
     auto socket = EntryBase::GetFdManager().Get(listenSock);
     if (!socket || socket->Category() != EntryCategory::Socket) {
+        DebugPrint(dbg_api, "sock = %d, return = -1, errno = EBADF", listenSock);
         errno = EBADF;
         return -1;
     }
 
     auto newSocket = ((QuicSocketEntry*)socket.get())->AcceptSocket();
-    if (!newSocket) return -1;
+    if (!newSocket) {
+        DebugPrint(dbg_api, "sock = %d, return = -1, errno = %d", listenSock, errno);
+        return -1;
+    }
 
+    DebugPrint(dbg_api, "sock = %d, newSocket = %d", listenSock, newSocket->Fd());
     return newSocket->Fd();
 }
 
@@ -89,13 +107,18 @@ QuicStream QuicStreamAccept(QuicSocket sock)
 {
     auto socket = EntryBase::GetFdManager().Get(sock);
     if (!socket || socket->Category() != EntryCategory::Socket) {
+        DebugPrint(dbg_api, "sock = %d, return = -1, errno = EBADF", sock);
         errno = EBADF;
         return -1;
     }
 
     auto stream = ((QuicSocketEntry*)socket.get())->AcceptStream();
-    if (!stream) return -1;
+    if (!stream) {
+        DebugPrint(dbg_api, "sock = %d, return = -1, errno = %d", sock, errno);
+        return -1;
+    }
 
+    DebugPrint(dbg_api, "sock = %d, newStream = %d", sock, stream->Fd());
     return stream->Fd();
 }
 
@@ -103,13 +126,18 @@ QuicStream QuicCreateStream(QuicSocket sock)
 {
     auto socket = EntryBase::GetFdManager().Get(sock);
     if (!socket || socket->Category() != EntryCategory::Socket) {
+        DebugPrint(dbg_api, "sock = %d, return = -1, errno = EBADF", sock);
         errno = EBADF;
         return -1;
     }
 
     auto stream = ((QuicSocketEntry*)socket.get())->CreateStream();
-    if (!stream) return -1;
+    if (!stream) {
+        DebugPrint(dbg_api, "sock = %d, return = -1, errno = %d", sock, errno);
+        return -1;
+    }
 
+    DebugPrint(dbg_api, "sock = %d, newStream = %d", sock, stream->Fd());
     return stream->Fd();
 }
 
@@ -117,6 +145,7 @@ int QuicCloseStream(QuicStream stream)
 {
     auto entry = EntryBase::GetFdManager().Get(stream);
     if (!entry || entry->Category() != EntryCategory::Stream) {
+        DebugPrint(dbg_api, "stream = %d, return = -1, errno = EBADF", stream);
         errno = EBADF;
         return -1;
     }
@@ -124,6 +153,7 @@ int QuicCloseStream(QuicStream stream)
     entry->Close();
     auto streamPtr = std::dynamic_pointer_cast<QuicStreamEntry>(entry);
     QuicStreamEntry::DeleteQuicStream(streamPtr);
+    DebugPrint(dbg_api, "stream = %d, return = 0", stream);
     return 0;
 }
 
@@ -131,11 +161,14 @@ ssize_t QuicWritev(QuicStream stream, const struct iovec* iov, int iov_count, bo
 {
     auto streamPtr = EntryBase::GetFdManager().Get(stream);
     if (!streamPtr || streamPtr->Category() != EntryCategory::Stream) {
+        DebugPrint(dbg_api, "stream = %d, return = -1, errno = EBADF", stream);
         errno = EBADF;
         return -1;
     }
 
-    return ((QuicStreamEntry*)streamPtr.get())->Writev(iov, iov_count, fin);
+    ssize_t res = ((QuicStreamEntry*)streamPtr.get())->Writev(iov, iov_count, fin);
+    DebugPrint(dbg_api, "stream = %d, return = %ld, errno = %d", stream, res, errno);
+    return res;
 }
 
 ssize_t QuicWrite(QuicStream stream, const void* data, size_t length, bool fin)
@@ -150,11 +183,14 @@ ssize_t QuicReadv(QuicStream stream, const struct iovec* iov, int iov_count)
 {
     auto streamPtr = EntryBase::GetFdManager().Get(stream);
     if (!streamPtr || streamPtr->Category() != EntryCategory::Stream) {
+        DebugPrint(dbg_api, "stream = %d, return = -1, errno = EBADF", stream);
         errno = EBADF;
         return -1;
     }
 
-    return ((QuicStreamEntry*)streamPtr.get())->Readv(iov, iov_count);
+    ssize_t res = ((QuicStreamEntry*)streamPtr.get())->Readv(iov, iov_count);
+    DebugPrint(dbg_api, "stream = %d, return = %ld, errno = %d", stream, res, errno);
+    return res;
 }
 
 ssize_t QuicRead(QuicStream stream, void* data, size_t length)
@@ -170,6 +206,8 @@ int QuicPoll(struct pollfd *fds, nfds_t nfds, int timeout)
 {
     if (!nfds) {
         usleep(timeout * 1000);
+        DebugPrint(dbg_api, "fds[0].fd = %d, nfds = %ld, timeout = %d, return = -1",
+                nfds > 0 ? fds[0].fd : -1, nfds, timeout);
         return -1;
     }
 
@@ -195,6 +233,8 @@ int QuicPoll(struct pollfd *fds, nfds_t nfds, int timeout)
             if (pfd.revents != 0)
                 ++res;
         }
+        DebugPrint(dbg_api, "fds[0].fd = %d, nfds = %ld, timeout = %d, return = %d, errno = %d",
+                nfds > 0 ? fds[0].fd : -1, nfds, timeout, res, errno);
         return res;
     }
 
@@ -236,6 +276,8 @@ int QuicPoll(struct pollfd *fds, nfds_t nfds, int timeout)
         if (pfd.revents != 0)
             ++res;
     }
+    DebugPrint(dbg_api, "fds[0].fd = %d, nfds = %ld, timeout = %d, return = %d, errno = %d",
+            nfds > 0 ? fds[0].fd : -1, nfds, timeout, res, errno);
     return res;
 }
 
@@ -243,6 +285,7 @@ int QuicPoll(struct pollfd *fds, nfds_t nfds, int timeout)
 QuicEpoller QuicCreateEpoll()
 {
     QuicEpollerEntryPtr ep = QuicEpollerEntry::NewQuicEpollerEntry();
+    DebugPrint(dbg_api, "epoll fd = %d", ep->Fd());
     return ep->Fd();
 }
 
@@ -250,11 +293,13 @@ int QuicCloseEpoller(QuicEpoller epfd)
 {
     QuicEpollerEntryPtr ep = QuicEpollerEntry::GetFdManager().Get(epfd);
     if (!ep) {
+        DebugPrint(dbg_api, "epoll fd = %d, return = -1, errno = EBADF", epfd);
         errno = EBADF;
         return -1;
     }
 
     QuicEpollerEntry::DeleteQuicEpollerEntry(ep);
+    DebugPrint(dbg_api, "epoll fd = %d, return = 0", epfd);
     return 0;
 }
 
@@ -262,35 +307,50 @@ int QuicEpollCtl(QuicEpoller epfd, int op, int quicFd, struct epoll_event *event
 {
     QuicEpollerEntryPtr ep = QuicEpollerEntry::GetFdManager().Get(epfd);
     if (!ep) {
+        DebugPrint(dbg_api, "epoll fd = %d, op = %s, quicFd = %d, return = -1, errno = EBADF",
+                epfd, EpollOp2Str(op), quicFd);
         errno = EBADF;
         return -1;
     }
 
+    int res;
     switch (op) {
         case EPOLL_CTL_ADD:
-            return ep->Add(quicFd, event);
+            res = ep->Add(quicFd, event);
+            break;
 
         case EPOLL_CTL_MOD:
-            return ep->Mod(quicFd, event);
+            res = ep->Mod(quicFd, event);
+            break;
 
         case EPOLL_CTL_DEL:
-            return ep->Del(quicFd);
+            res = ep->Del(quicFd);
+            break;
             
         default:
             errno = EINVAL;
-            return -1;
+            res = -1;
+            break;
     }
+
+    DebugPrint(dbg_api, "epoll fd = %d, op = %s, quicFd = %d, return = %d, errno = %d",
+            epfd, EpollOp2Str(op), quicFd, res, errno);
+    return res;
 }
 
 int QuicEpollWait(QuicEpoller epfd, struct epoll_event *events, int maxevents, int timeout)
 {
     QuicEpollerEntryPtr ep = QuicEpollerEntry::GetFdManager().Get(epfd);
     if (!ep) {
+        DebugPrint(dbg_api, "epoll fd = %d, return = -1, errno = EBADF", epfd);
         errno = EBADF;
         return -1;
     }
 
-    return ep->Wait(events, maxevents, timeout);
+    errno = 0;
+    int res = ep->Wait(events, maxevents, timeout);
+    DebugPrint(dbg_api, "epoll fd = %d, return = %d, errno = %d", epfd, res, errno);
+    return res;
 }
 
 } // namespace posix_quic

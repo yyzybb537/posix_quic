@@ -32,16 +32,15 @@ QuartcFactory& QuicSocketEntry::GetQuartcFactory()
     return factory;
 }
 
-QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry()
+QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry(bool isServer, QuicConnectionId id)
 {
-    return NewQuicSocketEntry(QuicRandom::GetInstance()->RandUint64());
-}
+    if (id == INVALID_QUIC_CONNECTION_ID)
+        id = QuicRandom::GetInstance()->RandUint64();
 
-QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry(QuicConnectionId id)
-{
     int fd = GetFdFactory().Alloc();
     std::shared_ptr<PosixQuicPacketTransport> packetTransport(new PosixQuicPacketTransport);
     QuartcFactoryInterface::QuartcSessionConfig config;
+    config.is_server = isServer;
     config.unique_remote_server_id = "";
     config.packet_transport = packetTransport.get();
     config.congestion_control = QuartcCongestionControl::kBBR;
@@ -124,6 +123,8 @@ int QuicSocketEntry::Bind(const struct sockaddr* addr, socklen_t addrlen)
 }
 int QuicSocketEntry::Connect(const struct sockaddr* addr, socklen_t addrlen)
 {
+    DebugPrint(dbg_connect, "begin. fd = %d", Fd());
+
     switch (socketState_) {
         case QuicSocketState_None:
             if (CreateNewUdpSocket() < 0) return -1;
@@ -144,10 +145,14 @@ int QuicSocketEntry::Connect(const struct sockaddr* addr, socklen_t addrlen)
 
     socketState_ = QuicSocketState_Connecting;
 
-    QuicSocketAddress address(*reinterpret_cast<const struct sockaddr_storage*>(addr));
+    struct sockaddr_storage addr_s = {};
+    memcpy(&addr_s, addr, addrlen);
+    QuicSocketAddress address(addr_s);
 
     packetTransport_->Set(udpSocket_, address);
 
+    DebugPrint(dbg_connect, "-> fd = %d, StartCryptoHandshake connectionId = %lu", Fd(), connection_id());
+    this->OnTransportCanWrite();
     this->StartCryptoHandshake();
 
     errno = EINPROGRESS;
@@ -232,16 +237,12 @@ void QuicSocketEntry::CloseStream(uint64_t streamId)
     QuartcSession::CloseStream(streamId);
 }
 
-void QuicSocketEntry::OnCanWrite()
-{
-    std::unique_lock<std::mutex> lock(mtx_);
-    QuartcSession::OnCanWrite();
-}
-
 void QuicSocketEntry::ProcessUdpPacket(const QuicSocketAddress& self_address,
         const QuicSocketAddress& peer_address,
         const QuicReceivedPacket& packet)
 {
+    DebugPrint(dbg_connect | dbg_accept | dbg_write | dbg_read | dbg_close,
+            "fd = %d, packet length = %d", Fd(), (int)packet.length());
     std::unique_lock<std::mutex> lock(mtx_);
     QuartcSession::ProcessUdpPacket(self_address, peer_address, packet);
 }
@@ -262,19 +263,30 @@ void QuicSocketEntry::PushAcceptQueue(QuicSocketEntryPtr entry)
     SetReadable(true);
 }
 
-void QuicSocketEntry::OnSyn(QuicSocketEntryPtr owner)
+void QuicSocketEntry::OnSyn(QuicSocketEntryPtr owner, QuicSocketAddress address)
 {
     socketState_ = QuicSocketState_Shared;
     udpSocket_ = owner->udpSocket_;
+    packetTransport_->Set(udpSocket_, address);
     GetConnectionManager().Put(*udpSocket_, connection_id(), Fd(), false);
+    this->OnTransportCanWrite();
+    DebugPrint(dbg_accept, "-> fd = %d, connectionId = %lu, OnSyn(owner=%d, address=%s)",
+            Fd(), connection_id(), owner->Fd(), address.ToString().c_str());
 }
 
 void QuicSocketEntry::OnCryptoHandshakeComplete()
 {
     socketState_ = QuicSocketState_Connected;
+    DebugPrint(dbg_connect | dbg_accept, "-> fd = %d, OnCryptoHandshakeComplete", Fd());
     SetWritable(true);
     if (perspective() == Perspective::IS_SERVER) {
         // push to owner accept queue.
+        assert(udpSocket_);
+        QuicSocket ownerSocket = GetConnectionManager().GetOwner(*udpSocket_);
+        EntryPtr owner = GetFdManager().Get(ownerSocket);
+        assert(owner->Category() == EntryCategory::Socket);
+
+        ((QuicSocketEntry*)owner.get())->PushAcceptQueue(shared_from_this());
     }
 }
 

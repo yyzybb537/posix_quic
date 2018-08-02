@@ -10,12 +10,21 @@ void PosixQuicPacketTransport::Set(std::shared_ptr<int> udpSocket, QuicSocketAdd
 
 int PosixQuicPacketTransport::Write(const char* buffer, size_t buf_len)
 {
-    if (!udpSocket_ || !address_.IsInitialized()) {
+    if (!udpSocket_) {
+        DebugPrint(dbg_write, "buffer length = %d, no udp socket. return = -1", (int)buf_len);
         return -1;
     }
 
-    auto s = address_.generic_address();
-    return ::sendto(*udpSocket_, buffer, buf_len, 0, (const struct sockaddr*)&s, sizeof(struct sockaddr_in));
+    if (!address_.IsInitialized()) {
+        DebugPrint(dbg_write, "Udp socket = %d, buffer length = %d, address not initialized. return = -1", *udpSocket_, (int)buf_len);
+        return -1;
+    }
+
+    struct sockaddr_storage addr = address_.generic_address();
+    int res = ::sendto(*udpSocket_, buffer, buf_len, 0, (const struct sockaddr*)&addr, sizeof(addr));
+    DebugPrint(dbg_write, "Udp socket = %d, buffer length = %d, return = %d, errno = %d",
+            *udpSocket_, (int)buf_len, res, errno);
+    return res;
 }
 
 } // namespace posix_quic

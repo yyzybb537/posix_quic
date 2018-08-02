@@ -49,6 +49,7 @@ void Event::Trigger(int event)
                 if (*waiter.events & POLLIN) {
                     __atomic_or_fetch(waiter.revents, POLLIN, std::memory_order_seq_cst);
                     trigger->Trigger();
+                    DebugPrint(dbg_event, "fd = %d, trigger event = POLLIN. waiter.revents = %s", Fd(), PollEvent2Str(*waiter.revents));
                 }
                 break;
 
@@ -56,12 +57,14 @@ void Event::Trigger(int event)
                 if (*waiter.events & POLLOUT) {
                     __atomic_or_fetch(waiter.revents, POLLOUT, std::memory_order_seq_cst);
                     trigger->Trigger();
+                    DebugPrint(dbg_event, "fd = %d, trigger event = POLLOUT. waiter.revents = %s", Fd(), PollEvent2Str(*waiter.revents));
                 }
                 break;
 
             case POLLERR:
                 __atomic_or_fetch(waiter.revents, POLLERR, std::memory_order_seq_cst);
                 trigger->Trigger();
+                DebugPrint(dbg_event, "fd = %d, trigger event = POLLERR. waiter.revents = %s", Fd(), PollEvent2Str(*waiter.revents));
                 break;
 
             default:
@@ -78,16 +81,20 @@ void Event::StopWait(EventTrigger * trigger)
 
 void Event::SetReadable(bool b)
 {
+    DebugPrint(dbg_event, "fd = %d, SetReadable(%s)", Fd(), b ? "true" : "false");
     readable = b;
     Trigger(POLLIN);
 }
 void Event::SetWritable(bool b)
 {
+    DebugPrint(dbg_event, "fd = %d, SetWritable(%s)", Fd(), b ? "true" : "false");
     writable = b;
     Trigger(POLLOUT);
 }
 void Event::SetError(int err, int quicErr)
 {
+    DebugPrint(dbg_event, "fd = %d, SetError(err=%d, quicErr=%d) now-error=%d",
+            Fd(), err, quicErr, error);
     if (error == 0) {
         error = err;
         quicErrorCode = (QuicErrorCode)quicErr;

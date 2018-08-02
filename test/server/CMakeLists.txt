@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD 14)
 #   cmake .. -DCMAKE_TOOLCHAIN_FILE=$CMAKE_TOOLCHAIN_FILE
 #   cmake .. -DCMAKE_TOOLCHAIN_FILE="/home/ubuntu/git-third/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
-project(client)
+project(server)
 set(TARGET ${CMAKE_PROJECT_NAME})
 
 # flags

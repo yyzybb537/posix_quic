@@ -3,19 +3,44 @@
 
 namespace posix_quic {
 
+HeaderParser::HeaderParser()
+    : serverFramer_(
+            net::AllSupportedVersions(),
+            net::QuicTime::Zero(),
+            net::Perspective::IS_SERVER
+            ),
+    clientFramer_(
+            net::AllSupportedVersions(),
+            net::QuicTime::Zero(),
+            net::Perspective::IS_SERVER
+            ),
+    connectionId_(INVALID_QUIC_CONNECTION_ID)
+{
+    serverFramer_.set_visitor(this);
+    clientFramer_.set_visitor(this);
+}
+
 QuicConnectionId HeaderParser::ParseHeader(const char* data, size_t len)
 {
-    if (len < 9) return INVALID_QUIC_CONNECTION_ID;
-    unsigned char flag = *(unsigned char*)data;
+    std::unique_lock<std::mutex> lock(mtx_);
+    data_ = data;
+    len_ = len;
+    connectionId_ = INVALID_QUIC_CONNECTION_ID;
+    serverFramer_.ProcessPacket(QuicEncryptedPacket(data_, len_));
+    return connectionId_;
+}
 
-    if (flag & 0x08 == 0) return INVALID_QUIC_CONNECTION_ID;
+bool HeaderParser::OnUnauthenticatedPublicHeader(const QuicPacketHeader& header)
+{
+    connectionId_ = header.connection_id;
+    return false;
+}
 
-    // 保留字段, 如果更高版本使用到了, 需要修改此处校验
-    if (flag & 0x80 != 0) return INVALID_QUIC_CONNECTION_ID;
-
-    // QUIC协议使用的是小尾, 而不是网络字节序.
-    QuicConnectionId id = *(QuicConnectionId*)(data + 1);
-    return id;
+void HeaderParser::OnError(QuicFramer* framer)
+{
+    if (framer == &serverFramer_) {
+        clientFramer_.ProcessPacket(QuicEncryptedPacket(data_, len_));
+    }
 }
 
 } // namespace posix_quic

@@ -1,6 +1,5 @@
 #include "epoller_entry.h"
 #include "clock.h"
-#include "header_parser.h"
 #include "socket_entry.h"
 #include "stream_entry.h"
 #include <sys/socket.h>
@@ -79,8 +78,11 @@ int QuicEpollerEntry::Add(int fd, struct epoll_event * event)
             return -1;
         }
         udps_[*udpSocket] = 1;
+
+        DebugPrint(dbg_epoll, "Add udp socket = %d, quicFd = %d", *udpSocket, fd);
     } else {
         udpItr->second++;
+        DebugPrint(dbg_epoll, "Ref udp socket = %d, quicFd = %d", *udpSocket, fd);
     }
 
     std::shared_ptr<quic_epoll_event> qev(new quic_epoll_event);
@@ -158,21 +160,25 @@ int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeou
         QuicSocketEntryPtr owner;
 
         for (int j = 0; j < 1024; ++j) {
-            struct sockaddr_in addr;
-            socklen_t addrLen;
+            struct sockaddr_storage addr = {};
+            socklen_t addrLen = sizeof(addr);
             int bytes = ::recvfrom(udpFd, &udpRecvBuf_[0], udpRecvBuf_.size(), 0, (struct sockaddr*)&addr, &addrLen);
+            DebugPrint(dbg_epoll | dbg_read, "syscall -> recvfrom. Udp socket = %d, bytes = %d, errno = %d", udpFd, bytes, errno);
             if (bytes < 0) break;
 
             // 1.解析quic framer
-            QuicConnectionId connectionId = HeaderParser::ParseHeader(&udpRecvBuf_[0], bytes);
+            QuicConnectionId connectionId = headerParser_.ParseHeader(&udpRecvBuf_[0], bytes);
             if (connectionId == INVALID_QUIC_CONNECTION_ID) {
                 // 不是quic包, 直接丢弃
+                DebugPrint(dbg_ignore, " -> recvfrom. Udp socket = %d, recv not quic packet. Hex = [%s]",
+                        udpFd, Bin2Hex(&udpRecvBuf_[0], (std::min)(bytes, 9)).c_str());
                 continue;
             }
 
             // 2.根据ConnectionId来分派, 给指定的QuicSocket
             QuicSocket quicSocket = QuicSocketEntry::GetConnectionManager().Get(udpFd, connectionId);
             if (quicSocket == -1) {
+
                 // 新连接
                 if (!owner) {
                     QuicSocket ownerFd = QuicSocketEntry::GetConnectionManager().GetOwner(udpFd);
@@ -185,23 +191,35 @@ int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeou
 
                 if (!owner) {
                     // listen socket已关闭, 不再接受新连接
+                    DebugPrint(dbg_epoll | dbg_read | dbg_accept,
+                            " -> recvfrom. Udp socket = %d, connectionId = %lu is a new Connection. Not found owner, so ignore it!",
+                            udpFd, connectionId);
                     continue;
                 }
 
-                QuicSocketEntryPtr socket = QuicSocketEntry::NewQuicSocketEntry();
-                socket->OnSyn(owner);
-                socket->ProcessUdpPacket(GetLocalAddress(udpFd),
-                        MakeAddress(&addr, addrLen),
-                        QuicReceivedPacket(&udpRecvBuf_[0], bytes, QuicClockImpl::getInstance().Now()));
+                DebugPrint(dbg_epoll | dbg_read | dbg_accept,
+                        " -> recvfrom. Udp socket = %d, connectionId = %lu is a new Connection.",
+                        udpFd, connectionId);
+
+                QuicSocketEntryPtr socket = QuicSocketEntry::NewQuicSocketEntry(true, connectionId);
+                socket->OnSyn(owner, QuicSocketAddress(addr));
                 socket->StartCryptoHandshake();
+                socket->ProcessUdpPacket(GetLocalAddress(udpFd),
+                        QuicSocketAddress(addr),
+                        QuicReceivedPacket(&udpRecvBuf_[0], bytes, QuicClockImpl::getInstance().Now()));
                 continue;
             }
 
-            EntryPtr socket = QuicSocketEntry::GetFdManager().Get(quicSocket);
-            assert(socket->Category() == EntryCategory::Socket);
+            DebugPrint(dbg_epoll | dbg_read, " -> recvfrom. Udp socket = %d, connectionId = %lu is exists.", udpFd, connectionId);
 
-            ((QuicSocketEntry*)socket.get())->ProcessUdpPacket(GetLocalAddress(udpFd),
-                MakeAddress(&addr, addrLen),
+
+            EntryPtr entry = QuicSocketEntry::GetFdManager().Get(quicSocket);
+            assert(entry->Category() == EntryCategory::Socket);
+
+            QuicSocketEntry* socket = (QuicSocketEntry*)entry.get();
+            socket->FlushWrites();
+            socket->ProcessUdpPacket(GetLocalAddress(udpFd),
+                QuicSocketAddress(addr),
                 QuicReceivedPacket(&udpRecvBuf_[0], bytes, QuicClockImpl::getInstance().Now()));
         }
     }
@@ -234,16 +252,11 @@ FdManager<QuicEpollerEntryPtr> & QuicEpollerEntry::GetFdManager()
 
 QuicSocketAddress QuicEpollerEntry::GetLocalAddress(UdpSocket udpSocket)
 {
-    struct sockaddr_in addr;
+    struct sockaddr_storage addr = {};
     socklen_t addrLen;
     int res = getsockname(udpSocket, (struct sockaddr*)&addr, &addrLen); 
     if (res != 0) return QuicSocketAddress();
-    return MakeAddress(&addr, addrLen);
-}
-
-QuicSocketAddress QuicEpollerEntry::MakeAddress(const struct sockaddr_in* addr, socklen_t addrLen)
-{
-    return QuicSocketAddress(*(const struct sockaddr_storage*)addr);
+    return QuicSocketAddress(addr);
 }
 
 short int QuicEpollerEntry::Epoll2Poll(uint32_t event)
