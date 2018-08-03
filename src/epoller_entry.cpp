@@ -320,4 +320,60 @@ uint32_t QuicEpollerEntry::Poll2Epoll(short int event)
     return ev;
 }
 
+std::string QuicEpollerEntry::GetDebugInfo(int indent)
+{
+    std::string idt(indent, ' ');
+    std::string idt2 = idt + ' ';
+    std::string idt3 = idt2 + ' ';
+
+    std::unique_lock<std::mutex> lock(mtx_);
+    std::string info;
+    info += idt + P("=========== epoll: %d ===========", Fd());
+
+    std::string socketInfo, streamInfo, closedInfo;
+    int socketCount = 0, streamCount = 0, closedCount = 0;
+    for (auto & kv : fds_) {
+        int fd = kv.first;
+        EntryPtr entry = kv.second.first.lock();
+        quic_epoll_event & qev = *(kv.second.second);
+        UdpSocket udp = -1;
+        if (entry) {
+            auto udpSocket = entry->NativeUdpFd();
+            if (udpSocket)
+                udp = *udpSocket;
+        }
+        std::string fdInfo(idt3);
+        fdInfo += P("-> fd: %d, UdpSocket: %d, events: %s, revents: %s",
+                fd, udp, EpollEvent2Str(qev.events), EpollEvent2Str(qev.revents));
+        if (!entry) {
+            closedInfo += fdInfo;
+            closedCount++;
+        } else if (entry->Category() == EntryCategory::Socket) {
+            socketInfo += fdInfo;
+            socketCount++;
+        } else if (entry->Category() == EntryCategory::Stream) {
+            streamInfo += fdInfo;
+            streamCount++;
+        }
+    }
+
+    info += idt2 + P("------------ QuicSocket (count=%d) ------------", socketCount);
+    info += socketInfo;
+
+    info += idt2 + P("------------ QuicStream (count=%d) ------------", streamCount);
+    info += streamInfo;
+
+    info += idt2 + P("------------ Closed (count=%d) ------------", closedCount);
+    info += closedInfo;
+
+    info += idt2 + P("------------ UDP (count=%d) ------------", (int)udps_.size());
+    for (auto & kv : udps_) {
+        int udpSocket = kv.first;
+        long ref = kv.second;
+        info += idt3 + P("-> udp: %d, refcount: %ld", udpSocket, ref);
+    }
+    info += idt + P("======================================");
+    return info;
+}
+
 } // namespace posix_quic

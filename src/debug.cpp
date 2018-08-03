@@ -1,10 +1,14 @@
 #include "debug.h"
 #include <unistd.h>
+#include <stdarg.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include "entry.h"
 #include <sys/epoll.h>
 #include <poll.h>
+#include "epoller_entry.h"
+#include "socket_entry.h"
+#include "stream_entry.h"
 
 namespace posix_quic {
 
@@ -151,6 +155,50 @@ const char* Perspective2Str(int perspective)
         default:
             return "Unkown";
     }
+}
+
+std::string Format(const char* fmt, ...)
+{
+    char buf[4096];
+    va_list ap;
+    va_start(ap, fmt);
+    int len = snprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    return std::string(buf, len);
+}
+
+std::string P(const char* fmt, ...)
+{
+    char buf[4096];
+    va_list ap;
+    va_start(ap, fmt);
+    int len = snprintf(buf, sizeof(buf) - 1, fmt, ap);
+    buf[len] = '\n';
+    buf[len+1] = '\0';
+    va_end(ap);
+    return std::string(buf, len + 1);
+}
+std::string P()
+{
+    return "\n";
+}
+
+std::string GlobalDebugInfo(uint32_t sourceMask)
+{
+    std::string info;
+    std::string line(30, '=');
+    line += P();
+
+    info += line;
+    if (sourceMask & src_epoll) {
+        QuicEpollerEntry::GetFdManager().Foreach(
+                [&](int epfd, QuicEpollerEntryPtr const& ep) {
+                    info += ep->GetDebugInfo(1) + P();
+                });
+        info += line;
+    }
+
+    return info;
 }
 
 } // namespace posix_quic

@@ -3,6 +3,7 @@
 #include "fwd.h"
 #include <unordered_map>
 #include <mutex>
+#include <set>
 
 namespace posix_quic {
 
@@ -31,6 +32,20 @@ public:
         DebugPrint(dbg_fd, "Del %s fd = %d", entry->DebugTypeInfo(), fd);
         map_.erase(iter);
         return true;
+    }
+
+    template <typename F>
+    void Foreach(F const& f) {
+        std::unique_lock<std::mutex> lock(mtx_);
+        std::set<int> fds;
+        for (auto & kv : map_) {
+            fds.insert(kv.first);
+        }
+        for (auto & fd : fds) {
+            auto iter = map_.find(fd);
+            if (map_.end() != iter)
+                f(fd, iter->second);
+        }
     }
 
 private:

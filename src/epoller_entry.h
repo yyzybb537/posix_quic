@@ -45,6 +45,8 @@ public:
 
     const char* DebugTypeInfo() { return "Epoll"; };
 
+    std::string GetDebugInfo(int indent);
+
 protected:
     QuicSocketAddress GetLocalAddress(UdpSocket udpSocket);
 

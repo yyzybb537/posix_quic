@@ -45,6 +45,19 @@ const char* EpollEvent2Str(uint32_t event);
 const char* EpollOp2Str(int op);
 const char* EntryCategory2Str(int category);
 const char* Perspective2Str(int perspective);
+std::string Format(const char* fmt, ...) __attribute__((format(printf,1,2)));
+std::string P(const char* fmt, ...) __attribute__((format(printf,1,2)));
+std::string P();
+
+enum eSourceMask {
+    src_epoll       = 0x1,
+    src_socket      = 0x1 << 1,
+    src_stream      = 0x1 << 2,
+    src_connection  = 0x1 << 3,
+    src_all = 0xffffffff,
+};
+
+std::string GlobalDebugInfo(uint32_t sourceMask);
 
 #define DebugPrint(type, fmt, ...) \
     do { \
