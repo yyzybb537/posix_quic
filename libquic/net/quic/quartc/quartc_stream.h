@@ -58,6 +58,8 @@ class QUIC_EXPORT_PRIVATE QuartcStream : public QuicStream,
 
   QuicConsumedData WritevData(const struct iovec* iov, int iov_count, bool fin);
 
+  void OnFinRead() override;
+
  private:
   QuartcStreamInterface::Delegate* delegate_ = nullptr;
 };

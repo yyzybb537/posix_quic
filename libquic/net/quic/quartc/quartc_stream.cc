@@ -44,6 +44,12 @@ QuicConsumedData QuartcStream::WritevData(const struct iovec* iov,
 {
     return QuicStream::WritevData(iov, iov_count, fin);
 }
+void QuartcStream::OnFinRead()
+{
+    QuicStream::OnFinRead();
+    DCHECK(delegate_);
+    delegate_->OnFinRead(this);
+}
 
 void QuartcStream::OnClose() {
   QuicStream::OnClose();

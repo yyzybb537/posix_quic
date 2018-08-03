@@ -5,16 +5,14 @@
 #include <mutex>
 #include <condition_variable>
 #include <set>
+#include "fd.h"
 
 namespace posix_quic {
 
-class Event
+class Event : public FdBase
 {
 public:
     virtual ~Event() {}
-
-    void SetFd(int fd) { fd_ = fd; }
-    int Fd() const { return fd_; }
 
     struct EventWaiter {
         short int* events;
@@ -31,7 +29,7 @@ public:
         void Trigger();
     };
 
-    int StartWait(EventWaiter waiter, EventTrigger * trigger);
+    bool StartWait(EventWaiter waiter, EventTrigger * trigger);
     void StopWait(EventTrigger * trigger);
     void Trigger(int event);
 
@@ -48,6 +46,11 @@ public:
 
     virtual const char* DebugTypeInfo() { return ""; };
 
+protected:
+    void TriggerWithoutLock(int event);
+
+    void ClearWaitingsByClose();
+
 private:
     bool readable = false;
     bool writable = false;
@@ -55,10 +58,9 @@ private:
     QuicErrorCode quicErrorCode = net::QUIC_NO_ERROR;
     int error = 0;
 
-    int fd_ = 0;
-
     std::mutex mtx_;
     std::map<EventTrigger*, EventWaiter> waitings_;
+    bool closeTrigger_ = false;
 };
 
 } // namespace posix_quic

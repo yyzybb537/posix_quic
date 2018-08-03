@@ -87,6 +87,8 @@ class QUIC_EXPORT_PRIVATE QuartcStreamInterface {
     virtual void OnBufferChanged(QuartcStreamInterface* stream) = 0;
 
     virtual void OnCanWriteNewData(QuartcStreamInterface* stream) = 0;
+
+    virtual void OnFinRead(QuartcStreamInterface* stream) = 0;
   };
 
   // The |delegate| is not owned by QuartcStream.

@@ -1,6 +1,8 @@
 TODO:
-1.收到fin的关闭stream流程
 2.丢包重传
 3.客户端漫游
 4.资源回收
 5.epoll从O(n)遍历优化成O(1)
+
+Done:
+1.收到fin的关闭stream流程

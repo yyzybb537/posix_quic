@@ -45,6 +45,8 @@ QuicStream QuicCreateStream(QuicSocket sock);
 
 int QuicCloseStream(QuicStream stream);
 
+int QuicStreamShutdown(QuicStream stream, int how);
+
 ssize_t QuicWritev(QuicStream stream, const struct iovec* iov, int iov_count,
         bool fin);
 

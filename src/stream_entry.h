@@ -50,6 +50,8 @@ private:
     void OnBufferChanged(QuartcStreamInterface* stream) override {}
 
     void OnCanWriteNewData(QuartcStreamInterface* stream) override;
+
+    void OnFinRead(QuartcStreamInterface* stream) override;
     // -----------------------------------------------------------------
 
 private:
@@ -61,6 +63,8 @@ private:
     QuicSocketEntryWeakPtr socketEntry_;
 
     QuicStreamId streamId_;
+
+    bool finRead_ = false;
 };
 
 

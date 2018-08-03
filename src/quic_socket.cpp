@@ -157,6 +157,21 @@ int QuicCloseStream(QuicStream stream)
     return 0;
 }
 
+int QuicStreamShutdown(QuicStream stream, int how)
+{
+    auto entry = EntryBase::GetFdManager().Get(stream);
+    if (!entry || entry->Category() != EntryCategory::Stream) {
+        DebugPrint(dbg_api, "stream = %d, return = -1, errno = EBADF", stream);
+        errno = EBADF;
+        return -1;
+    }
+
+    auto streamPtr = std::dynamic_pointer_cast<QuicStreamEntry>(entry);
+    int res = streamPtr->Shutdown(how);
+    DebugPrint(dbg_api, "stream = %d, return = 0", stream);
+    return res;
+}
+
 ssize_t QuicWritev(QuicStream stream, const struct iovec* iov, int iov_count, bool fin)
 {
     auto streamPtr = EntryBase::GetFdManager().Get(stream);
@@ -241,6 +256,7 @@ int QuicPoll(struct pollfd *fds, nfds_t nfds, int timeout)
     std::vector<EntryPtr> entries(nfds);
     Event::EventTrigger trigger;
     int events = 0;
+    int nWaiting = 0;
     for (nfds_t i = 0; i < nfds; i++) {
         struct pollfd & pfd = fds[i];
         pfd.revents = 0;
@@ -255,11 +271,14 @@ int QuicPoll(struct pollfd *fds, nfds_t nfds, int timeout)
         Event::EventWaiter waiter = { &pfd.events, &pfd.revents };
 
         auto entry = EntryBase::GetFdManager().Get(pfd.fd);
-        events |= entry->StartWait(waiter, &trigger);
-        entries.push_back(entry);
+        if (entry->StartWait(waiter, &trigger)) {
+            nWaiting++;
+            entries.push_back(entry);
+        }
+        events |= pfd.revents;
     }
 
-    if (events == 0) {
+    if (events == 0 && nWaiting) {
         // not triggered, wait it.
         trigger.Wait(timeout);
     }

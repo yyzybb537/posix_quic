@@ -10,6 +10,7 @@ namespace posix_quic {
 QuicEpollerEntry::QuicEpollerEntry()
 {
     SetFd(epoll_create(10240));
+    trigger_.epollfd = Fd();
 }
 
 QuicEpollerEntry::~QuicEpollerEntry()
@@ -42,6 +43,12 @@ void QuicEpollerEntry::DeleteQuicEpollerEntry(QuicEpollerEntryPtr ep)
 }
 int QuicEpollerEntry::Add(int fd, struct epoll_event * event)
 {
+    int res = AddInner(fd, event);
+    DebugPrint(dbg_epoll, "fd = %d, events = %s", fd, EpollEvent2Str(event->events));
+    return res;
+}
+int QuicEpollerEntry::AddInner(int fd, struct epoll_event * event)
+{
     std::unique_lock<std::mutex> lock(mtx_);
     auto itr = fds_.find(fd);
     if (itr != fds_.end()) {
@@ -60,6 +67,20 @@ int QuicEpollerEntry::Add(int fd, struct epoll_event * event)
         return -1;
     }
 
+    std::shared_ptr<quic_epoll_event> qev(new quic_epoll_event);
+    qev->events = Epoll2Poll(event->events);
+    qev->data = event->data;
+    qev->revents = 0;
+
+    Event::EventWaiter waiter = { &qev->events, &qev->revents };
+    if (!entry->StartWait(waiter, &trigger_)) {
+        errno = EBADF;
+        return -1;
+    }
+
+    fds_[fd] = std::make_pair(EntryWeakPtr(entry), qev);
+
+    // listen udp
     std::shared_ptr<int> udpSocket = entry->NativeUdpFd();
     if (!udpSocket) {
         // QuicSocket必须已经有了对应的udp socket才能加入Epoller.
@@ -85,18 +106,15 @@ int QuicEpollerEntry::Add(int fd, struct epoll_event * event)
         DebugPrint(dbg_epoll, "Ref udp socket = %d, quicFd = %d", *udpSocket, fd);
     }
 
-    std::shared_ptr<quic_epoll_event> qev(new quic_epoll_event);
-    qev->events = Epoll2Poll(event->events);
-    qev->data = event->data;
-    qev->revents = 0;
-
-    fds_[fd] = std::make_pair(EntryWeakPtr(entry), qev);
-
-    Event::EventWaiter waiter = { &qev->events, &qev->revents };
-    entry->StartWait(waiter, &trigger_);
     return 0;
 }
 int QuicEpollerEntry::Mod(int fd, struct epoll_event * event)
+{
+    int res = ModInner(fd, event);
+    DebugPrint(dbg_epoll, "fd = %d, events = %s", fd, EpollEvent2Str(event->events));
+    return res;
+}
+int QuicEpollerEntry::ModInner(int fd, struct epoll_event * event)
 {
     std::unique_lock<std::mutex> lock(mtx_);
     auto itr = fds_.find(fd);
@@ -111,6 +129,12 @@ int QuicEpollerEntry::Mod(int fd, struct epoll_event * event)
     return 0;
 }
 int QuicEpollerEntry::Del(int fd)
+{
+    int res = DelInner(fd);
+    DebugPrint(dbg_epoll, "fd = %d", fd);
+    return res;
+}
+int QuicEpollerEntry::DelInner(int fd)
 {
     std::unique_lock<std::mutex> lock(mtx_);
     auto itr = fds_.find(fd);
@@ -237,7 +261,7 @@ int QuicEpollerEntry::Poll(struct epoll_event *events, int maxevents)
         if (i >= maxevents) break;
 
         quic_epoll_event & qev = *(kv.second.second);
-        short int event = qev.events;
+        short int event = qev.events | POLLERR;
 
 //        DebugPrint(dbg_event, "fd = %d, qev.revents = %s, event = %s",
 //                kv.first, PollEvent2Str(qev.revents), PollEvent2Str(event));

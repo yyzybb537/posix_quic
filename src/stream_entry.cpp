@@ -36,6 +36,7 @@ ssize_t QuicStreamEntry::Writev(const struct iovec* iov, size_t iov_count, bool 
         return -1;
     }
 
+    errno = 0;
     return resData.bytes_consumed;
 }
 
@@ -44,6 +45,11 @@ ssize_t QuicStreamEntry::Readv(const struct iovec* iov, size_t iov_count)
     if (Error()) {
         errno = Error();
         return -1;
+    }
+
+    if (finRead_) {
+        errno = 0;
+        return 0;
     }
 
     auto stream = GetQuartcStream();
@@ -58,6 +64,7 @@ ssize_t QuicStreamEntry::Readv(const struct iovec* iov, size_t iov_count)
         return -1;
     }
 
+    errno = 0;
     return res;
 }
 
@@ -83,12 +90,11 @@ int QuicStreamEntry::Shutdown(int how)
 int QuicStreamEntry::Close()
 {
     auto stream = GetQuartcStream();
-    if (!stream) {
-        errno = EBADF;
-        return -1;
+    if (stream) {
+        stream->Close();  // will call this->OnClose to SetError
     }
 
-    stream->Close();
+    ClearWaitingsByClose();
     return 0;
 }
 void QuicStreamEntry::DeleteQuicStream(QuicStreamEntryPtr const& ptr)
@@ -114,6 +120,15 @@ void QuicStreamEntry::OnClose(QuartcStreamInterface* stream)
 void QuicStreamEntry::OnCanWriteNewData(QuartcStreamInterface* stream)
 {
     SetWritable(true);
+}
+
+void QuicStreamEntry::OnFinRead(QuartcStreamInterface* stream)
+{
+    if (finRead_)
+        return ;
+
+    DebugPrint(dbg_read, "stream fd = %d", Fd());
+    finRead_ = true;
 }
 
 QuartcStreamPtr QuicStreamEntry::GetQuartcStream()

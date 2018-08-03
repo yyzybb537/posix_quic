@@ -2,6 +2,7 @@
 #include <chrono>
 #include <atomic>
 #include <poll.h>
+#include "epoller_entry.h"
 
 namespace posix_quic {
 
@@ -25,9 +26,11 @@ void Event::EventTrigger::Trigger()
     cv.notify_one();
 }
 
-int Event::StartWait(EventWaiter waiter, EventTrigger * trigger)
+bool Event::StartWait(EventWaiter waiter, EventTrigger * trigger)
 {
     std::unique_lock<std::mutex> lock(mtx_);
+    if (closeTrigger_) return false;
+
     if ((*waiter.events & POLLIN) && Readable())
         *waiter.revents |= POLLIN;
     if ((*waiter.events & POLLOUT) && Writable())
@@ -36,11 +39,17 @@ int Event::StartWait(EventWaiter waiter, EventTrigger * trigger)
         *waiter.revents |= POLLERR;
 
     waitings_[trigger] = waiter;
-    return *waiter.revents;
+    return true;
 }
+
 void Event::Trigger(int event)
 {
     std::unique_lock<std::mutex> lock(mtx_);
+    TriggerWithoutLock(event);
+}
+
+void Event::TriggerWithoutLock(int event)
+{
     for (auto & kv : waitings_) {
         EventTrigger * trigger = kv.first;
         EventWaiter & waiter = kv.second;
@@ -49,7 +58,8 @@ void Event::Trigger(int event)
                 if (*waiter.events & POLLIN) {
                     __atomic_fetch_or(waiter.revents, POLLIN, std::memory_order_seq_cst);
                     trigger->Trigger();
-                    DebugPrint(dbg_event, "fd = %d, trigger event = POLLIN. waiter.revents = %s", Fd(), PollEvent2Str(*waiter.revents));
+                    DebugPrint(dbg_event, "fd = %d, epfd = %d, trigger event = POLLIN. waiter.revents = %s",
+                            Fd(), trigger->epollfd, PollEvent2Str(*waiter.revents));
                 }
                 break;
 
@@ -57,14 +67,16 @@ void Event::Trigger(int event)
                 if (*waiter.events & POLLOUT) {
                     __atomic_fetch_or(waiter.revents, POLLOUT, std::memory_order_seq_cst);
                     trigger->Trigger();
-                    DebugPrint(dbg_event, "fd = %d, trigger event = POLLOUT. waiter.revents = %s", Fd(), PollEvent2Str(*waiter.revents));
+                    DebugPrint(dbg_event, "fd = %d, epfd = %d, trigger event = POLLOUT. waiter.revents = %s",
+                            Fd(), trigger->epollfd, PollEvent2Str(*waiter.revents));
                 }
                 break;
 
             case POLLERR:
                 __atomic_fetch_or(waiter.revents, POLLERR, std::memory_order_seq_cst);
                 trigger->Trigger();
-                DebugPrint(dbg_event, "fd = %d, trigger event = POLLERR. waiter.revents = %s", Fd(), PollEvent2Str(*waiter.revents));
+                DebugPrint(dbg_event, "fd = %d, epfd = %d, trigger event = POLLERR. waiter.revents = %s",
+                        Fd(), trigger->epollfd, PollEvent2Str(*waiter.revents));
                 break;
 
             default:
@@ -99,6 +111,27 @@ void Event::SetError(int err, int quicErr)
         error = err;
         quicErrorCode = (QuicErrorCode)quicErr;
         Trigger(POLLERR);
+    }
+}
+
+void Event::ClearWaitingsByClose()
+{
+    if (closeTrigger_) return ;
+
+    std::vector<int> epollfds;
+    std::unique_lock<std::mutex> lock(mtx_);
+    closeTrigger_ = true;
+    for (auto & kv : waitings_) {
+        if (kv.first->epollfd != -1)
+            epollfds.push_back(kv.first->epollfd);
+    }
+    waitings_.clear();
+    lock.unlock();
+
+    for (auto epfd : epollfds) {
+        auto ep = QuicEpollerEntry::GetFdManager().Get(epfd);
+        if (!ep) continue;
+        ep->Del(Fd());
     }
 }
 

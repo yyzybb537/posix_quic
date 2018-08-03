@@ -9,7 +9,7 @@
 
 namespace posix_quic {
 
-class QuicEpollerEntry : public Event
+class QuicEpollerEntry : public FdBase
 {
 public:
     struct quic_epoll_event {
@@ -43,7 +43,7 @@ public:
 
     int Wait(struct epoll_event *events, int maxevents, int timeout);
 
-    const char* DebugTypeInfo() override { return "Epoll"; };
+    const char* DebugTypeInfo() { return "Epoll"; };
 
 protected:
     QuicSocketAddress GetLocalAddress(UdpSocket udpSocket);
@@ -53,6 +53,13 @@ protected:
     uint32_t Poll2Epoll(short int event);
 
     int Poll(struct epoll_event *events, int maxevents);
+
+private:
+    int AddInner(int fd, struct epoll_event *event);
+
+    int ModInner(int fd, struct epoll_event *event);
+
+    int DelInner(int fd);
 
 private:
     std::mutex mtx_;

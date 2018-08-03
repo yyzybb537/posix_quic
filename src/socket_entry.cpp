@@ -169,6 +169,7 @@ int QuicSocketEntry::Close()
     if (udpSocket_)
         GetConnectionManager().Delete(*udpSocket_, connection_id(), Fd());
     CloseConnection("");
+    ClearWaitingsByClose();
     return 0;
 }
 QuicSocketEntryPtr QuicSocketEntry::AcceptSocket()

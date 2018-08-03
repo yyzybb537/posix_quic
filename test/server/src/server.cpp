@@ -19,6 +19,29 @@ using namespace posix_quic;
         }\
     } while (0)
 
+int OnRead(QuicStream fd) {
+    int res;
+    char buf[10240];
+    for (;;) {
+        res = QuicRead(fd, buf, sizeof(buf));
+        if (res < 0) {
+            if (errno == EAGAIN)
+                return 0;
+
+            QuicCloseStream(fd);
+            return 1;
+        } else if (res == 0) {
+            QuicStreamShutdown(fd, SHUT_WR);
+            return 1;
+        }
+
+        UserLog("recv(len=%d): %.*s\n", res, res, buf);
+
+        res = QuicWrite(fd, buf, res, false);
+        CHECK_RES(res, "write");
+    }
+}
+
 int doLoop(QuicEpoller ep, QuicSocket listenSock) {
     struct epoll_event evs[1024];
     int n = QuicEpollWait(ep, evs, sizeof(evs)/sizeof(struct epoll_event), 6000);
@@ -67,8 +90,9 @@ int doLoop(QuicEpoller ep, QuicSocket listenSock) {
                             ev.events = EPOLLIN;
                             res = QuicEpollCtl(ep, EPOLL_CTL_ADD, newStream, &ev);
                             CHECK_RES(res, "epoll_ctl");
-
                             UserLog("Accept Stream fd=%d, newSocket=%d\n", fd, newStream);
+
+                            OnRead(newStream);
                         } else {
                             UserLog("No Accept Stream. fd=%d\n", fd);
                             break;
@@ -78,14 +102,7 @@ int doLoop(QuicEpoller ep, QuicSocket listenSock) {
 
             } else if (category == EntryCategory::Stream) {
                 // stream, recv data.
-                char buf[10240];
-                res = QuicRead(fd, buf, sizeof(buf));
-                CHECK_RES(res, "read");
-
-                UserLog("recv(len=%d): %.*s\n", res, res, buf);
-
-                res = QuicWrite(fd, buf, res, false);
-                CHECK_RES(res, "write");
+                OnRead(fd);
             }
         }
 
