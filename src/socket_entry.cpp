@@ -68,6 +68,19 @@ void QuicSocketEntry::DeleteQuicSocketEntry(QuicSocketEntryPtr ptr)
     }
 }
 
+void QuicSocketEntry::ClearAcceptSocketByClose()
+{
+    if (!acceptSockets_.empty()) {
+        std::unique_lock<std::mutex> lock(acceptSocketsMtx_);
+        while (!acceptSockets_.empty()) {
+            auto socket = acceptSockets_.front();
+            acceptSockets_.pop_front();
+            socket->Close();
+            DeleteQuicSocketEntry(socket);
+        }
+    }
+}
+
 int QuicSocketEntry::CreateNewUdpSocket()
 {
     if (udpSocket_) {
@@ -165,11 +178,15 @@ int QuicSocketEntry::Connect(const struct sockaddr* addr, socklen_t addrlen)
 }
 int QuicSocketEntry::Close()
 {
+    if (socketState_ == QuicSocketState_Closed)
+        return 0;
+
     socketState_ = QuicSocketState_Closed;
     if (udpSocket_)
         GetConnectionManager().Delete(*udpSocket_, connection_id(), Fd());
     CloseConnection("");
     ClearWaitingsByClose();
+    ClearAcceptSocketByClose();
     return 0;
 }
 QuicSocketEntryPtr QuicSocketEntry::AcceptSocket()
@@ -179,14 +196,14 @@ QuicSocketEntryPtr QuicSocketEntry::AcceptSocket()
         return QuicSocketEntryPtr();
     }
 
-    std::unique_lock<std::mutex> lock(acceptQueueMtx_);
-    if (acceptQueue_.empty()) {
+    std::unique_lock<std::mutex> lock(acceptSocketsMtx_);
+    if (acceptSockets_.empty()) {
         errno = EAGAIN;
         return QuicSocketEntryPtr();
     }
 
-    auto ptr = acceptQueue_.front();
-    acceptQueue_.pop();
+    auto ptr = acceptSockets_.front();
+    acceptSockets_.pop_front();
     return ptr;
 }
 QuicStreamEntryPtr QuicSocketEntry::AcceptStream()
@@ -196,10 +213,10 @@ QuicStreamEntryPtr QuicSocketEntry::AcceptStream()
         return QuicStreamEntryPtr();
     }
 
-    std::unique_lock<std::mutex> lock(streamQueueMtx_);
-    while (!streamQueue_.empty()) {
-        QuicStreamEntryPtr stream = streamQueue_.front();
-        streamQueue_.pop();
+    std::unique_lock<std::mutex> lock(acceptStreamsMtx_);
+    while (!acceptStreams_.empty()) {
+        QuicStreamEntryPtr stream = acceptStreams_.front();
+        acceptStreams_.pop_front();
         return stream;
     }
 
@@ -260,8 +277,8 @@ std::shared_ptr<int> QuicSocketEntry::NativeUdpFd() const
 void QuicSocketEntry::PushAcceptQueue(QuicSocketEntryPtr entry)
 {
     DebugPrint(dbg_accept, "this->fd = %d, newSocket->fd = %d", Fd(), entry->Fd());
-    std::unique_lock<std::mutex> lock(acceptQueueMtx_);
-    acceptQueue_.push(entry);
+    std::unique_lock<std::mutex> lock(acceptSocketsMtx_);
+    acceptSockets_.push_back(entry);
     SetReadable(true);
 }
 
@@ -296,8 +313,8 @@ void QuicSocketEntry::OnCryptoHandshakeComplete()
 void QuicSocketEntry::OnIncomingStream(QuartcStreamInterface* stream)
 {
     QuicStreamEntryPtr streamPtr = QuicStreamEntry::NewQuicStream(shared_from_this(), stream);
-    std::unique_lock<std::mutex> lock(streamQueueMtx_);
-    streamQueue_.push(streamPtr);
+    std::unique_lock<std::mutex> lock(acceptStreamsMtx_);
+    acceptStreams_.push_back(streamPtr);
     SetReadable(true);
 }
 
@@ -306,6 +323,51 @@ void QuicSocketEntry::OnConnectionClosed(int error_code, bool from_remote)
     socketState_ = QuicSocketState_Closed;
     SetCloseByPeer(from_remote);
     SetError(ESHUTDOWN, error_code);
+}
+
+std::string QuicSocketEntry::GetDebugInfo(int indent)
+{
+    std::string idt(indent, ' ');
+    std::string idt2 = idt + ' ';
+    std::string idt3 = idt2 + ' ';
+
+    std::unique_lock<std::mutex> lock(mtx_);
+    std::string info;
+    info += idt + P("=========== Socket: %d ===========", Fd());
+
+    if (!acceptSockets_.empty()) {
+        std::unique_lock<std::mutex> lock(acceptSocketsMtx_);
+        if (!acceptSockets_.empty()) {
+            info += idt2 + P("accept socket list: (count = %d)", (int)acceptSockets_.size());
+
+            for (auto & socket : acceptSockets_) {
+                info += idt3 + P("-> fd = %d", socket->Fd());
+            }
+        }
+    }
+
+    if (!acceptStreams_.empty()) {
+        std::unique_lock<std::mutex> lock(acceptStreamsMtx_);
+        if (!acceptStreams_.empty()) {
+            info += idt2 + P("accept stream list: (count = %d)", (int)acceptStreams_.size());
+
+            for (auto & stream : acceptStreams_) {
+                info += idt3 + P("-> fd = %d", stream->Fd());
+            }
+        }
+    }
+
+    size_t numInStreams = GetNumOpenIncomingStreams();
+    size_t numOutStreams = GetNumOpenOutgoingStreams();
+
+    if (numInStreams > 0)
+        info += idt2 + P("Number incoming stream: %d", (int)numInStreams);
+
+    if (numOutStreams > 0)
+        info += idt2 + P("Number outgoing stream: %d", (int)numOutStreams);
+
+    info += Event::GetDebugInfo(indent + 1);
+    return info;
 }
 
 } // namespace posix_quic

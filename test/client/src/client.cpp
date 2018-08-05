@@ -53,6 +53,8 @@ int doLoop(QuicEpoller ep) {
         }
 
         if (ev.events & EPOLLIN) {
+            UserLog("QuicDebugInfo:\n%s\n", GlobalDebugInfo(src_all).c_str());
+
             if (category == EntryCategory::Socket) {
                 // client needn't accept
             } else if (category == EntryCategory::Stream) {
@@ -86,7 +88,7 @@ int doLoop(QuicEpoller ep) {
 }
 
 int main() {
-    debug_mask = dbg_all;
+//    debug_mask = dbg_all;
 
     QuicEpoller ep = QuicCreateEpoll();
     assert(ep >= 0);

@@ -61,7 +61,7 @@ std::string GlobalDebugInfo(uint32_t sourceMask);
 
 #define DebugPrint(type, fmt, ...) \
     do { \
-        if (type == ::posix_quic::dbg_user || (::posix_quic::debug_mask & (type))) { \
+        if ((type) == ::posix_quic::dbg_user || (::posix_quic::debug_mask & (type)) != 0) { \
             ErrnoStore es; \
             fprintf(::posix_quic::debug_output, "[%s][P%05d]%s:%d:(%s)\t " fmt "\n", \
                     ::posix_quic::GetCurrentTime().c_str(),\

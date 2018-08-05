@@ -33,6 +33,8 @@ public:
     static FdManager<EntryPtr> & GetFdManager();
 
     const char* DebugTypeInfo() override { return EntryCategory2Str((int)Category()); };
+
+    virtual std::string GetDebugInfo(int indent) = 0;
 };
 
 } // namespace posix_quic

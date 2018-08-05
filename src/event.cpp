@@ -9,7 +9,10 @@ namespace posix_quic {
 void Event::EventTrigger::Wait(int timeout)
 {
     std::unique_lock<std::mutex> lock(cvMtx);
-    if (triggered) return ;
+    if (triggered) {
+        triggered = false;
+        return ;
+    }
     if (timeout > 0) {
         cv.wait_for(lock, std::chrono::milliseconds(timeout));
     } else if (timeout == 0) {
@@ -133,6 +136,32 @@ void Event::ClearWaitingsByClose()
         if (!ep) continue;
         ep->Del(Fd());
     }
+}
+
+std::string Event::GetDebugInfo(int indent)
+{
+    std::string idt(indent, ' ');
+    std::string idt2 = idt + ' ';
+    std::string idt3 = idt2 + ' ';
+
+    std::string info;
+    std::string event;
+    if (Readable()) event += "readable |";
+    if (Writable()) event += "writable |";
+    if (Error()) event += Format("error = %d |", error);
+    if (event.empty()) event = "nil";
+    else event.resize(event.size() - 2);
+
+    info += idt + P("Event: %s", event.c_str());
+    std::unique_lock<std::mutex> lock(mtx_);
+    info += idt + P("Listener: %d", (int)waitings_.size());
+    for (auto & kv : waitings_) {
+        int epfd = kv.first->epollfd;
+        info += idt2 + P("-> epfd = %d, events = %s, revents = %s",
+                epfd, PollEvent2Str(*kv.second.events), PollEvent2Str(*kv.second.revents));
+    }
+
+    return info;
 }
 
 } // namespace posix_quic

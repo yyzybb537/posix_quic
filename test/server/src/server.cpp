@@ -65,6 +65,7 @@ int doLoop(QuicEpoller ep, QuicSocket listenSock) {
             if (category == EntryCategory::Socket) {
                 if (fd == listenSock) {
                     // accept socket
+//                    UserLog("QuicDebugInfo:\n%s\n", GlobalDebugInfo(src_all).c_str());
                     for (;;) {
                         QuicSocket newSocket = QuicSocketAccept(fd);
                         if (newSocket > 0) {
@@ -121,7 +122,7 @@ int doLoop(QuicEpoller ep, QuicSocket listenSock) {
 }
 
 int main() {
-    debug_mask = dbg_all;
+//    debug_mask = dbg_all;
     
     QuicEpoller ep = QuicCreateEpoll();
     assert(ep >= 0);

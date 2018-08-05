@@ -46,6 +46,8 @@ public:
 
     virtual const char* DebugTypeInfo() { return ""; };
 
+    std::string GetDebugInfo(int indent);
+
 protected:
     void TriggerWithoutLock(int event);
 

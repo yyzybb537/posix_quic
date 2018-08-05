@@ -159,20 +159,20 @@ const char* Perspective2Str(int perspective)
 
 std::string Format(const char* fmt, ...)
 {
-    char buf[4096];
     va_list ap;
     va_start(ap, fmt);
-    int len = snprintf(buf, sizeof(buf), fmt, ap);
+    char buf[4096];
+    int len = vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
     return std::string(buf, len);
 }
 
 std::string P(const char* fmt, ...)
 {
-    char buf[4096];
     va_list ap;
     va_start(ap, fmt);
-    int len = snprintf(buf, sizeof(buf) - 1, fmt, ap);
+    char buf[4096];
+    int len = vsnprintf(buf, sizeof(buf) - 1, fmt, ap);
     buf[len] = '\n';
     buf[len+1] = '\0';
     va_end(ap);
@@ -197,6 +197,24 @@ std::string GlobalDebugInfo(uint32_t sourceMask)
                 });
         info += line;
     }
+
+    std::string socketInfo, streamInfo;
+    if ((sourceMask & src_socket) || (sourceMask & src_stream)) {
+        EntryBase::GetFdManager().Foreach(
+                [&](int epfd, EntryPtr const& entry) {
+                    EntryCategory category = entry->Category();
+                    if (category == EntryCategory::Socket && (sourceMask & src_socket)) {
+                        socketInfo += entry->GetDebugInfo(1);
+                    }
+                    else if (category == EntryCategory::Stream && (sourceMask & src_stream)) {
+                        streamInfo += entry->GetDebugInfo(1);
+                    }
+                });
+    }
+    info += socketInfo;
+    info += line;
+    info += streamInfo;
+    info += line;
 
     return info;
 }

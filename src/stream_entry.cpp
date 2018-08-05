@@ -139,4 +139,19 @@ QuartcStreamPtr QuicStreamEntry::GetQuartcStream()
     return socket->GetQuartcStream(streamId_);
 }
 
+std::string QuicStreamEntry::GetDebugInfo(int indent)
+{
+    std::string idt(indent, ' ');
+    std::string idt2 = idt + ' ';
+    std::string idt3 = idt2 + ' ';
+
+    std::string info;
+    info += idt + P("=========== Stream: %d ===========", Fd());
+    auto socket = socketEntry_.lock();
+    info += idt2 + P("From socket: %d", socket ? socket->Fd() : -1);
+
+    info += Event::GetDebugInfo(indent + 1);
+    return info;
+}
+
 };

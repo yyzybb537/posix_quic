@@ -40,6 +40,8 @@ public:
     }
     static void DeleteQuicStream(QuicStreamEntryPtr const& ptr);
 
+    std::string GetDebugInfo(int indent);
+
     // -----------------------------------------------------------------
     // QuartcStreamInterface::Delegate
 private:

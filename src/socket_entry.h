@@ -5,6 +5,7 @@
 #include <mutex>
 #include <queue>
 #include <set>
+#include <list>
 #include "entry.h"
 #include "packet_transport.h"
 #include "connection_manager.h"
@@ -87,6 +88,8 @@ public:
 
     void OnSyn(QuicSocketEntryPtr owner, QuicSocketAddress address);
 
+    std::string GetDebugInfo(int indent);
+
     // -----------------------------------------------------------------
     // QuartcSessionInterface::Delegate
 private:
@@ -102,6 +105,8 @@ private:
 
     int CreateNewUdpSocket();
 
+    void ClearAcceptSocketByClose();
+
 private:
     std::mutex mtx_;
 
@@ -109,12 +114,12 @@ private:
     QuicSocketState socketState_ = QuicSocketState_None;
 
     // accept socket queue
-    std::mutex acceptQueueMtx_;
-    std::queue<QuicSocketEntryPtr> acceptQueue_;
+    std::mutex acceptSocketsMtx_;
+    std::list<QuicSocketEntryPtr> acceptSockets_;
 
     // accept stream queue
-    std::mutex streamQueueMtx_;
-    std::queue<QuicStreamEntryPtr> streamQueue_;
+    std::mutex acceptStreamsMtx_;
+    std::list<QuicStreamEntryPtr> acceptStreams_;
 
     std::shared_ptr<PosixQuicPacketTransport> packetTransport_;
 };
