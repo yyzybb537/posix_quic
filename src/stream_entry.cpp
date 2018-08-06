@@ -60,6 +60,16 @@ ssize_t QuicStreamEntry::Readv(const struct iovec* iov, size_t iov_count)
 
     int res = stream->Readv(iov, iov_count);
     if (res == 0) {
+        if (Error()) {
+            errno = Error();
+            return -1;
+        }
+
+        if (finRead_) {
+            errno = 0;
+            return 0;
+        }
+
         errno = EAGAIN;
         return -1;
     }

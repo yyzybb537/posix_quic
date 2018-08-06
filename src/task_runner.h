@@ -25,6 +25,12 @@ public:
         Task * task;
         TaskMap::iterator itr;
         std::atomic_flag invalid{false};
+        long id;
+
+        inline static long& StaticTaskId() {
+            static long taskId = 0;
+            return taskId;
+        }
     };
 
     struct ScheduledTask
@@ -35,6 +41,7 @@ public:
 
         void Cancel() override {
             if (!storage_->invalid.test_and_set(std::memory_order_acquire)) {
+                DebugPrint(dbg_timer, "cancel schedule(id=%ld)", storage_->id);
                 QuicTaskRunner::getInstance().Cancel(storage_->itr);
             }
         }

@@ -217,88 +217,88 @@ ssize_t QuicRead(QuicStream stream, void* data, size_t length)
 }
 
 // poll
-int QuicPoll(struct pollfd *fds, nfds_t nfds, int timeout)
-{
-    if (!nfds) {
-        usleep(timeout * 1000);
-        DebugPrint(dbg_api, "fds[0].fd = %d, nfds = %ld, timeout = %d, return = -1",
-                nfds > 0 ? fds[0].fd : -1, nfds, timeout);
-        return -1;
-    }
-
-    if (!timeout) {
-        int res = 0;
-        for (nfds_t i = 0; i < nfds; i++) {
-            struct pollfd & pfd = fds[i];
-            pfd.revents = 0;
-            if (pfd.events == 0)
-                continue;
-
-            if (pfd.fd < 0)
-                continue;
-
-            auto entry = EntryBase::GetFdManager().Get(pfd.fd);
-            if ((pfd.events & POLLIN) && entry->Readable())
-                pfd.revents |= POLLIN;
-            if ((pfd.events & POLLOUT) && entry->Writable())
-                pfd.revents |= POLLOUT;
-            if (entry->Error())
-                pfd.revents |= POLLERR;
-
-            if (pfd.revents != 0)
-                ++res;
-        }
-        DebugPrint(dbg_api, "fds[0].fd = %d, nfds = %ld, timeout = %d, return = %d, errno = %d",
-                nfds > 0 ? fds[0].fd : -1, nfds, timeout, res, errno);
-        return res;
-    }
-
-    std::vector<EntryPtr> entries(nfds);
-    Event::EventTrigger trigger;
-    int events = 0;
-    int nWaiting = 0;
-    for (nfds_t i = 0; i < nfds; i++) {
-        struct pollfd & pfd = fds[i];
-        pfd.revents = 0;
-        if (pfd.events == 0) {
-            continue;
-        }
-
-        if (pfd.fd < 0) {
-            continue;
-        }
-
-        Event::EventWaiter waiter = { &pfd.events, &pfd.revents };
-
-        auto entry = EntryBase::GetFdManager().Get(pfd.fd);
-        if (entry->StartWait(waiter, &trigger)) {
-            nWaiting++;
-            entries.push_back(entry);
-        }
-        events |= pfd.revents;
-    }
-
-    if (events == 0 && nWaiting) {
-        // not triggered, wait it.
-        trigger.Wait(timeout);
-    }
-
-    for (auto & entry : entries) {
-        entry->StopWait(&trigger);
-    }
-
-    entries.clear();
-
-    int res = 0;
-    for (nfds_t i = 0; i < nfds; i++) {
-        struct pollfd & pfd = fds[i];
-        if (pfd.revents != 0)
-            ++res;
-    }
-    DebugPrint(dbg_api, "fds[0].fd = %d, nfds = %ld, timeout = %d, return = %d, errno = %d",
-            nfds > 0 ? fds[0].fd : -1, nfds, timeout, res, errno);
-    return res;
-}
+//int QuicPoll(struct pollfd *fds, nfds_t nfds, int timeout)
+//{
+//    if (!nfds) {
+//        usleep(timeout * 1000);
+//        DebugPrint(dbg_api, "fds[0].fd = %d, nfds = %ld, timeout = %d, return = -1",
+//                nfds > 0 ? fds[0].fd : -1, nfds, timeout);
+//        return -1;
+//    }
+//
+//    if (!timeout) {
+//        int res = 0;
+//        for (nfds_t i = 0; i < nfds; i++) {
+//            struct pollfd & pfd = fds[i];
+//            pfd.revents = 0;
+//            if (pfd.events == 0)
+//                continue;
+//
+//            if (pfd.fd < 0)
+//                continue;
+//
+//            auto entry = EntryBase::GetFdManager().Get(pfd.fd);
+//            if ((pfd.events & POLLIN) && entry->Readable())
+//                pfd.revents |= POLLIN;
+//            if ((pfd.events & POLLOUT) && entry->Writable())
+//                pfd.revents |= POLLOUT;
+//            if (entry->Error())
+//                pfd.revents |= POLLERR;
+//
+//            if (pfd.revents != 0)
+//                ++res;
+//        }
+//        DebugPrint(dbg_api, "fds[0].fd = %d, nfds = %ld, timeout = %d, return = %d, errno = %d",
+//                nfds > 0 ? fds[0].fd : -1, nfds, timeout, res, errno);
+//        return res;
+//    }
+//
+//    std::vector<EntryPtr> entries(nfds);
+//    Event::EventTrigger trigger;
+//    int events = 0;
+//    int nWaiting = 0;
+//    for (nfds_t i = 0; i < nfds; i++) {
+//        struct pollfd & pfd = fds[i];
+//        pfd.revents = 0;
+//        if (pfd.events == 0) {
+//            continue;
+//        }
+//
+//        if (pfd.fd < 0) {
+//            continue;
+//        }
+//
+//        Event::EventWaiter waiter = { &pfd.events, &pfd.revents };
+//
+//        auto entry = EntryBase::GetFdManager().Get(pfd.fd);
+//        if (entry->StartWait(waiter, &trigger)) {
+//            nWaiting++;
+//            entries.push_back(entry);
+//        }
+//        events |= pfd.revents;
+//    }
+//
+//    if (events == 0 && nWaiting) {
+//        // not triggered, wait it.
+//        trigger.Wait(timeout);
+//    }
+//
+//    for (auto & entry : entries) {
+//        entry->StopWait(&trigger);
+//    }
+//
+//    entries.clear();
+//
+//    int res = 0;
+//    for (nfds_t i = 0; i < nfds; i++) {
+//        struct pollfd & pfd = fds[i];
+//        if (pfd.revents != 0)
+//            ++res;
+//    }
+//    DebugPrint(dbg_api, "fds[0].fd = %d, nfds = %ld, timeout = %d, return = %d, errno = %d",
+//            nfds > 0 ? fds[0].fd : -1, nfds, timeout, res, errno);
+//    return res;
+//}
 
 // epoll
 QuicEpoller QuicCreateEpoll()

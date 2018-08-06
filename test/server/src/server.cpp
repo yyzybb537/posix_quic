@@ -122,7 +122,7 @@ int doLoop(QuicEpoller ep, QuicSocket listenSock) {
 }
 
 int main() {
-//    debug_mask = dbg_all;
+    debug_mask = dbg_all & ~dbg_timer;
     
     QuicEpoller ep = QuicCreateEpoll();
     assert(ep >= 0);
