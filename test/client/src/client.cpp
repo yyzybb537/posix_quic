@@ -18,6 +18,18 @@ using namespace posix_quic;
         }\
     } while (0)
 
+bool gIsTestReset = false;
+bool gIsTestSocketReset = false;
+bool gIsTestSocketResetWithStream = false;
+
+QuicSocket conn = -1;
+
+void onStreamClose() {
+    if (gIsTestSocketReset) {
+        QuicCloseSocket(conn);
+    }
+}
+
 int doLoop(QuicEpoller ep) {
     struct epoll_event evs[1024];
     int n = QuicEpollWait(ep, evs, sizeof(evs)/sizeof(struct epoll_event), 6000);
@@ -65,10 +77,19 @@ int doLoop(QuicEpoller ep) {
 
                 UserLog("recv(len=%d): %.*s\n", res, res, buf);
 
-                if (std::string(buf, res) != "Bye") {
+                if (gIsTestSocketResetWithStream)
+                    QuicCloseSocket(conn);
+                else if (std::string(buf, res) != "Bye") {
                     std::string s = "Bye";
-                    res = QuicWrite(fd, s.c_str(), s.size(), true);
-                    CHECK_RES(res, "write");
+                    if (gIsTestReset) {
+                        res = QuicWrite(fd, s.c_str(), s.size(), false);
+                        CHECK_RES(res, "write");
+                        QuicCloseStream(fd);
+                        onStreamClose();
+                    } else {
+                        res = QuicWrite(fd, s.c_str(), s.size(), true);
+                        CHECK_RES(res, "write");
+                    }
                 }
             }
         }
@@ -80,6 +101,7 @@ int doLoop(QuicEpoller ep) {
             } else if (category == EntryCategory::Stream) {
                 UserLog("Close Stream fd=%d\n", fd);
                 QuicCloseStream(fd);
+                onStreamClose();
             } 
         }
     }
@@ -95,6 +117,7 @@ int main() {
 
     QuicSocket socket = QuicCreateSocket();
     assert(socket > 0);
+    conn = socket;
 
     int res;
 
