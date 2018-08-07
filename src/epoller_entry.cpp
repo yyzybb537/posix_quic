@@ -11,6 +11,7 @@ QuicEpollerEntry::QuicEpollerEntry()
 {
     SetFd(epoll_create(10240));
     trigger_.epollfd = Fd();
+    signal(EPIPE, SIG_IGN);
 }
 
 QuicEpollerEntry::~QuicEpollerEntry()
@@ -189,9 +190,14 @@ int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeou
         for (int j = 0; j < 1024; ++j) {
             struct sockaddr_storage addr = {};
             socklen_t addrLen = sizeof(addr);
+retry_recvfrom:
             int bytes = ::recvfrom(udpFd, &udpRecvBuf_[0], udpRecvBuf_.size(), 0, (struct sockaddr*)&addr, &addrLen);
             DebugPrint(dbg_epoll | dbg_read, "syscall -> recvfrom. Udp socket = %d, bytes = %d, errno = %d", udpFd, bytes, errno);
-            if (bytes < 0) break;
+            if (bytes < 0) {
+                if (errno == EINTR)
+                    goto retry_recvfrom;
+                break;
+            }
 
             // 1.解析quic framer
             QuicConnectionId connectionId = headerParser_.ParseHeader(&udpRecvBuf_[0], bytes);

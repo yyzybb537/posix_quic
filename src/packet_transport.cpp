@@ -21,7 +21,11 @@ int PosixQuicPacketTransport::Write(const char* buffer, size_t buf_len)
     }
 
     struct sockaddr_storage addr = address_.generic_address();
+retry_sendto:
     int res = ::sendto(*udpSocket_, buffer, buf_len, 0, (const struct sockaddr*)&addr, sizeof(addr));
+    if (res == -1 && errno == EINTR)
+        goto retry_sendto;
+
     DebugPrint(dbg_write, "Udp socket = %d, buffer length = %d, return = %d, errno = %d",
             *udpSocket_, (int)buf_len, res, errno);
     return res;
