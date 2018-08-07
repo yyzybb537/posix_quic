@@ -53,6 +53,7 @@ QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry(bool isServer, QuicConnec
     sptr->SetFd(fd);
     sptr->packetTransport_ = packetTransport;
     sptr->SetDelegate(sptr.get());
+    sptr->connection()->SetAlarmLock(&sptr->mtx_);
 
     GetFdManager().Put(fd, sptr);
     return sptr;
