@@ -321,9 +321,14 @@ void QuicSocketEntry::OnIncomingStream(QuartcStreamInterface* stream)
 
 void QuicSocketEntry::OnConnectionClosed(int error_code, bool from_remote)
 {
-    socketState_ = QuicSocketState_Closed;
     SetCloseByPeer(from_remote);
     SetError(ESHUTDOWN, error_code);
+
+    if (socketState_ != QuicSocketState_Connected && perspective() == Perspective::IS_SERVER) {
+        // 接受链接失败, fd还没吐给用户层
+        this->Close();
+        DeleteQuicSocketEntry(shared_from_this());
+    }
 }
 
 std::string QuicSocketEntry::GetDebugInfo(int indent)
