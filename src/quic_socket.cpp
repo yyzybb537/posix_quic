@@ -28,6 +28,24 @@ int QuicCloseSocket(QuicSocket sock)
     return 0;
 }
 
+int GetQuicError(QuicSocket sock)
+{
+    EntryPtr entry = EntryBase::GetFdManager().Get(sock);
+    if (!entry || entry->Category() != EntryCategory::Socket) {
+        DebugPrint(dbg_api, "sock = %d, return = -1, errno = EBADF", sock);
+        errno = EBADF;
+        return -1;
+    }
+
+    errno = entry->Error();
+    return (int)entry->GetQuicErrorCode();
+}
+
+const char* QuicErrorToString(int quicErrorCode)
+{
+    return net::QuicErrorCodeToString((QuicErrorCode)quicErrorCode);
+}
+
 int QuicBind(QuicSocket sock, const struct sockaddr* addr, socklen_t addrlen)
 {
     auto socket = EntryBase::GetFdManager().Get(sock);

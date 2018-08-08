@@ -78,6 +78,8 @@ class QUIC_EXPORT_PRIVATE QuartcSession
                 QuicClock* clock);
   ~QuartcSession() override;
 
+  void Initialize() override;
+
   // QuicSession overrides.
   QuicCryptoStream* GetMutableCryptoStream() override;
 

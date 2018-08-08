@@ -19,11 +19,10 @@ QuartcFactory& QuicSocketEntry::GetQuartcFactory()
     static QuartcFactory factory(
             QuartcFactoryConfig{&QuicTaskRunner::getInstance(), &QuicClockImpl::getInstance()},
             []( std::unique_ptr<QuicConnection> connection,
-                const QuicConfig& config,
-                const std::string& unique_remote_server_id,
+                const QuicConfig& config, const std::string& unique_remote_server_id,
                 Perspective perspective,
                 QuicConnectionHelperInterface* helper,
-                QuicClock* clock)
+                QuicClock* clock )
             {
                 return static_cast<QuartcSessionInterface*>(new QuicSocketEntry(
                         std::move(connection), config, unique_remote_server_id,
@@ -54,6 +53,8 @@ QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry(bool isServer, QuicConnec
     sptr->packetTransport_ = packetTransport;
     sptr->SetDelegate(sptr.get());
     sptr->connection()->SetAlarmLock(&sptr->mtx_);
+    sptr->connection()->set_debug_visitor(&sptr->connectionVisitor_);
+    sptr->connectionVisitor_.Bind(&sptr->mtx_, sptr->connection(), &sptr->opts_, sptr.get());
 
     GetFdManager().Put(fd, sptr);
     return sptr;
@@ -118,6 +119,26 @@ ConnectionManager & QuicSocketEntry::GetConnectionManager()
     return obj;
 }
 
+// 链接建立前设置才有效, 握手协商后就直接取协商值使用了.
+void QuicSocketEntry::SetOpt(int type, long value)
+{
+    if (!opts_.SetOption(type, value)) return ;
+
+    switch (type) {
+        case sockopt_ack_timeout_secs:
+            {
+                std::unique_lock<std::mutex> lock(mtx_);
+                connectionVisitor_.SetNoAckAlarm();
+            }
+            break;
+    }
+}
+
+long QuicSocketEntry::GetOpt(int type) const
+{
+    return opts_.GetOption(type);
+}
+
 int QuicSocketEntry::Bind(const struct sockaddr* addr, socklen_t addrlen)
 {
     switch (socketState_) {
@@ -172,6 +193,9 @@ int QuicSocketEntry::Connect(const struct sockaddr* addr, socklen_t addrlen)
 
     DebugPrint(dbg_connect, "-> fd = %d, StartCryptoHandshake connectionId = %lu", Fd(), connection_id());
     this->OnTransportCanWrite();
+    this->Initialize();
+    if (GetOpt(sockopt_ack_timeout_secs) == 0 && kDefaultAckTimeout)
+        this->SetOpt(sockopt_ack_timeout_secs, kDefaultAckTimeout);
     this->StartCryptoHandshake();
 
     errno = EINPROGRESS;
@@ -289,9 +313,13 @@ void QuicSocketEntry::OnSyn(QuicSocketEntryPtr owner, QuicSocketAddress address)
     udpSocket_ = owner->udpSocket_;
     packetTransport_->Set(udpSocket_, address);
     GetConnectionManager().Put(*udpSocket_, connection_id(), Fd(), false);
-    this->OnTransportCanWrite();
     DebugPrint(dbg_accept, "-> fd = %d, connectionId = %lu, OnSyn(owner=%d, address=%s)",
             Fd(), connection_id(), owner->Fd(), address.ToString().c_str());
+    this->OnTransportCanWrite();
+    this->Initialize();
+    if (GetOpt(sockopt_ack_timeout_secs) == 0 && kDefaultAckTimeout)
+        this->SetOpt(sockopt_ack_timeout_secs, kDefaultAckTimeout);
+    this->StartCryptoHandshake();
 }
 
 void QuicSocketEntry::OnCryptoHandshakeComplete()

@@ -280,7 +280,7 @@ void QuartcSession::OnConnectionClosed(QuicErrorCode error,
       error, source == ConnectionCloseSource::FROM_PEER);
 }
 
-void QuartcSession::StartCryptoHandshake() {
+void QuartcSession::Initialize() {
   if (perspective_ == Perspective::IS_CLIENT) {
     QuicServerId server_id(unique_remote_server_id_, kQuicServerPort);
     QuicCryptoClientStream* crypto_stream =
@@ -288,7 +288,6 @@ void QuartcSession::StartCryptoHandshake() {
                                    quic_crypto_client_config_.get(), this);
     crypto_stream_.reset(crypto_stream);
     QuicSession::Initialize();
-    crypto_stream->CryptoConnect();
   } else {
     quic_compressed_certs_cache_.reset(new QuicCompressedCertsCache(
         QuicCompressedCertsCache::kQuicCompressedCertsCacheSize));
@@ -298,6 +297,12 @@ void QuartcSession::StartCryptoHandshake() {
         use_stateless_rejects_if_peer_supported, this, &stream_helper_);
     crypto_stream_.reset(crypto_stream);
     QuicSession::Initialize();
+  }
+}
+
+void QuartcSession::StartCryptoHandshake() {
+  if (perspective_ == Perspective::IS_CLIENT) {
+    ((QuicCryptoClientStream*)crypto_stream_.get())->CryptoConnect();
   }
 }
 

@@ -29,6 +29,10 @@ QuicSocket QuicCreateSocket();
 
 int QuicCloseSocket(QuicSocket sock);
 
+int GetQuicError(QuicSocket sock);
+
+const char* QuicErrorToString(int quicErrorCode);
+
 int QuicBind(QuicSocket sock, const struct sockaddr* addr, socklen_t addrlen);
 
 int QuicListen(QuicSocket sock, int backlog);

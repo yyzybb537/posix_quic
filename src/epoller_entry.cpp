@@ -236,7 +236,6 @@ retry_recvfrom:
 
                 QuicSocketEntryPtr socket = QuicSocketEntry::NewQuicSocketEntry(true, connectionId);
                 socket->OnSyn(owner, QuicSocketAddress(addr));
-                socket->StartCryptoHandshake();
                 socket->ProcessUdpPacket(GetLocalAddress(udpFd),
                         QuicSocketAddress(addr),
                         QuicReceivedPacket(&udpRecvBuf_[0], bytes, QuicClockImpl::getInstance().Now()));

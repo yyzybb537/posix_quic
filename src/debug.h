@@ -19,6 +19,8 @@ enum eDbgMask {
     dbg_event       = 0x1 << 8,
     dbg_fd          = 0x1 << 9,
     dbg_timer       = 0x1 << 10,
+    dbg_conn_visitor= 0x1 << 11,
+    dbg_ack_timeout = 0x1 << 12,
     dbg_user        = 0x1 << 31,
     dbg_all         = 0xffffffff,
 };

@@ -10,6 +10,7 @@
 #include "packet_transport.h"
 #include "connection_manager.h"
 #include "net/quic/quartc/quartc_session_interface.h"
+#include "connection_visitor.h"
 
 namespace posix_quic {
 
@@ -48,6 +49,10 @@ public:
         // 已关闭
         QuicSocketState_Closed,
     };
+
+    void SetOpt(int type, long value);
+
+    long GetOpt(int type) const;
 
     int Bind(const struct sockaddr* addr, socklen_t addrlen);
 
@@ -122,6 +127,10 @@ private:
     std::list<QuicStreamEntryPtr> acceptStreams_;
 
     std::shared_ptr<PosixQuicPacketTransport> packetTransport_;
+
+    QuicSocketOptions opts_;
+
+    QuicConnectionVisitor connectionVisitor_;
 };
 
 } // namespace posix_quic
