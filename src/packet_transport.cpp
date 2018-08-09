@@ -26,9 +26,11 @@ retry_sendto:
     if (res == -1 && errno == EINTR)
         goto retry_sendto;
 
-    DebugPrint(dbg_write, "Udp socket = %d, buffer length = %d, return = %d, errno = %d",
-            *udpSocket_, (int)buf_len, res, errno);
-    return res;
+    DebugPrint(dbg_write, "sento %s Udp socket = %d, buffer length = %d, return = %d, errno = %d",
+            address_.ToString().c_str(), *udpSocket_, (int)buf_len, res, errno);
+
+    // 告诉协议栈, udp总是可用的, 以便于切网也可以正常重传
+    return buf_len;
 }
 
 } // namespace posix_quic

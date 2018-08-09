@@ -2,8 +2,9 @@
 #include "clock.h"
 #include "socket_entry.h"
 #include "stream_entry.h"
-#include <sys/socket.h>
 #include <poll.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
 namespace posix_quic {
 
@@ -166,6 +167,7 @@ int QuicEpollerEntry::DelInner(int fd)
     fds_.erase(itr);
     return 0;
 }
+
 int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeout)
 {
     udpEvents_.resize((std::max<size_t>)(udps_.size(), 1));
@@ -191,8 +193,14 @@ int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeou
             struct sockaddr_storage addr = {};
             socklen_t addrLen = sizeof(addr);
 retry_recvfrom:
-            int bytes = ::recvfrom(udpFd, &udpRecvBuf_[0], udpRecvBuf_.size(), 0, (struct sockaddr*)&addr, &addrLen);
-            DebugPrint(dbg_epoll | dbg_read, "syscall -> recvfrom. Udp socket = %d, bytes = %d, errno = %d", udpFd, bytes, errno);
+            int bytes = ::recvfrom(udpFd, &udpRecvBuf_[0], udpRecvBuf_.size(),
+                    0, reinterpret_cast<struct sockaddr*>(&addr), &addrLen);
+            ErrnoStore es;
+            QuicSocketAddress peerAddress(addr);
+            DebugPrint(dbg_epoll | dbg_read, "syscall -> recvfrom %s. Udp socket = %d, bytes = %d, errno = %d",
+                    peerAddress.ToString().c_str(),
+                    udpFd, bytes, errno);
+            es.Restore();
             if (bytes < 0) {
                 if (errno == EINTR)
                     goto retry_recvfrom;
@@ -235,9 +243,9 @@ retry_recvfrom:
                         udpFd, connectionId);
 
                 QuicSocketEntryPtr socket = QuicSocketEntry::NewQuicSocketEntry(true, connectionId);
-                socket->OnSyn(owner, QuicSocketAddress(addr));
+                socket->OnSyn(owner, peerAddress);
                 socket->ProcessUdpPacket(GetLocalAddress(udpFd),
-                        QuicSocketAddress(addr),
+                        peerAddress,
                         QuicReceivedPacket(&udpRecvBuf_[0], bytes, QuicClockImpl::getInstance().Now()));
                 continue;
             }
@@ -251,7 +259,7 @@ retry_recvfrom:
             QuicSocketEntry* socket = (QuicSocketEntry*)entry.get();
             socket->FlushWrites();
             socket->ProcessUdpPacket(GetLocalAddress(udpFd),
-                QuicSocketAddress(addr),
+                peerAddress,
                 QuicReceivedPacket(&udpRecvBuf_[0], bytes, QuicClockImpl::getInstance().Now()));
         }
     }

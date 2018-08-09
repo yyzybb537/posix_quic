@@ -34,12 +34,18 @@ const char* BaseFile(const char* file);
 
 class ErrnoStore {
 public:
-    ErrnoStore() : errno_(errno) {}
+    ErrnoStore() : errno_(errno), restored_(false) {}
     ~ErrnoStore() {
+        Restore();
+    }
+    void Restore() {
+        if (restored_) return ;
+        restored_ = true;
         errno = errno_;
     }
 private:
     int errno_;
+    bool restored_;
 };
 
 std::string Bin2Hex(const char* data, size_t length, const std::string& split = "");
