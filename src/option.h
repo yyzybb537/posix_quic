@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string.h>
+
 namespace posix_quic {
 
 enum eQuicSocketOptionType

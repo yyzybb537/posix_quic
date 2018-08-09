@@ -1,17 +1,14 @@
 #pragma once
 
+#include "fwd_ext.h"
 #include <memory>
 #include "net/quic/quartc/quartc_session.h"
 #include "net/quic/quartc/quartc_session_interface.h"
 #include "net/quic/quartc/quartc_factory.h"
 #include "net/quic/quartc/quartc_task_runner_interface.h"
 #include "debug.h"
-#include "option.h"
-#include "constants.h"
 
 namespace posix_quic {
-
-#define INVALID_QUIC_CONNECTION_ID QuicConnectionId(-1)
 
 using net::QuicConnectionId;
 using net::QuicStreamId;
@@ -52,10 +49,6 @@ using ConnectionCloseSource = net::ConnectionCloseSource;
 using ParsedQuicVersion = net::ParsedQuicVersion;
 using QuicConfig = net::QuicConfig;
 using CachedNetworkParameters = net::CachedNetworkParameters;
-
-typedef int UdpSocket;
-typedef int QuicSocket;
-typedef int QuicStream;
 
 typedef std::shared_ptr<QuartcStream> QuartcStreamPtr;
 

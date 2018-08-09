@@ -1,12 +1,9 @@
 TODO:
-*.客户端漫游
-*.资源回收
+*.SetOpt\GetOpt
 *.epoll从O(n)遍历优化成O(1)
-*.socket的正常关闭
 *.性能压测
 *.大并发压测
-
-*.服务端关闭半连接时, 主动发送一个RST包
+*.资源回收
 
 Done:
 *.收到fin的关闭stream流程
@@ -17,3 +14,9 @@ Done:
 *.服务端关闭后, 客户端更快感知链接断开事件 (用心跳不回ack来检测)
 *.服务端的IdleTimeout设置的短一点
 *.epollwait期间触发err要快速响应.(注册一个空fd到epoll中, 触发err事件就刷一下)
+*.客户端漫游
+*.减轻quic_socket.h的include负担
+
+Dis:
+*.socket的正常关闭
+*.服务端关闭半连接时, 主动发送一个RST包

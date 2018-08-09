@@ -13,11 +13,13 @@
 */
 #pragma once
 
-#include "fwd.h"
+#include "fwd_ext.h"
 #include <memory>
 #include <poll.h>
 #include <sys/epoll.h>
-#include "entry.h"
+#include <sys/types.h>
+#include <sys/uio.h>
+#include <sys/socket.h>
 
 namespace posix_quic {
 
