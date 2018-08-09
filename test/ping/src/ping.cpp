@@ -73,7 +73,7 @@ int doLoop(QuicEpoller ep) {
 
                 UserLog("recv(len=%d): %.*s\n", res, res, buf);
 
-                sleep(1);
+                sleep(5);
 
                 if (res > 0) {
                     res = QuicWrite(fd, buf, res, false);

@@ -7,6 +7,9 @@ enum eQuicSocketOptionType
     // 需要对端回复的时候, N秒没有收到回复或任何有效包, 即认为链接断开
     sockopt_ack_timeout_secs,
 
+    // 链路空闲超时, 由于客户端会发心跳, 这个可以用于server端检测链接是否断开
+    sockopt_idle_timeout_secs,
+
     sockopt_count,
 };
 

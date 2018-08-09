@@ -123,6 +123,14 @@ ConnectionManager & QuicSocketEntry::GetConnectionManager()
 // 链接建立前设置才有效, 握手协商后就直接取协商值使用了.
 void QuicSocketEntry::SetOpt(int type, long value)
 {
+    switch (type) {
+        case sockopt_idle_timeout_secs:
+            if (value < kMinIdleTimeout) {
+                value = kMinIdleTimeout;
+            }
+            break;
+    }
+
     if (!opts_.SetOption(type, value)) return ;
 
     switch (type) {
@@ -130,6 +138,15 @@ void QuicSocketEntry::SetOpt(int type, long value)
             {
                 std::unique_lock<std::mutex> lock(mtx_);
                 connectionVisitor_.SetNoAckAlarm();
+            }
+            break;
+
+        case sockopt_idle_timeout_secs:
+            {
+                std::unique_lock<std::mutex> lock(mtx_);
+                config()->SetIdleNetworkTimeout(QuicTime::Delta::FromSeconds(value),
+                        QuicTime::Delta::FromSeconds(value));
+                connection()->SetFromConfig(*config());
             }
             break;
     }
@@ -320,6 +337,8 @@ void QuicSocketEntry::OnSyn(QuicSocketEntryPtr owner, QuicSocketAddress address)
     this->Initialize();
     if (GetOpt(sockopt_ack_timeout_secs) == 0 && kDefaultAckTimeout)
         this->SetOpt(sockopt_ack_timeout_secs, kDefaultAckTimeout);
+    if (GetOpt(sockopt_idle_timeout_secs) == 0 && kDefaultIdleTimeout)
+        this->SetOpt(sockopt_idle_timeout_secs, kDefaultIdleTimeout);
     this->StartCryptoHandshake();
 }
 

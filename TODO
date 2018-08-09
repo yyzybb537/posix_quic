@@ -1,5 +1,4 @@
 TODO:
-*.服务端的IdleTimeout设置的短一点
 *.epollwait期间触发err要快速响应.(注册一个空fd到epoll中, 触发err事件就刷一下)
 *.客户端漫游
 *.资源回收
@@ -17,4 +16,5 @@ Done:
 *.stream强制rst关闭 (QuicCloseStream)
 *.socket强制rst关闭 (QuicCloseSocket)
 *.服务端关闭后, 客户端更快感知链接断开事件 (用心跳不回ack来检测)
+*.服务端的IdleTimeout设置的短一点
 
