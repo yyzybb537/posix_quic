@@ -1,5 +1,4 @@
 TODO:
-*.SetOpt\GetOpt
 *.epoll从O(n)遍历优化成O(1)
 *.性能压测
 *.大并发压测
@@ -16,6 +15,7 @@ Done:
 *.epollwait期间触发err要快速响应.(注册一个空fd到epoll中, 触发err事件就刷一下)
 *.客户端漫游
 *.减轻quic_socket.h的include负担
+*.SetQuicSocketOpt/GetQuicSocketOpt
 
 Dis:
 *.socket的正常关闭

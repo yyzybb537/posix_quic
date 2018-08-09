@@ -20,6 +20,7 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/socket.h>
+#include "debug.h"
 
 namespace posix_quic {
 
@@ -63,6 +64,12 @@ ssize_t QuicReadv(QuicStream stream, const struct iovec* iov, int iov_count);
 ssize_t QuicWrite(QuicStream stream, const void* data, size_t length, bool fin);
 
 ssize_t QuicRead(QuicStream stream, void* data, size_t length);
+
+// socket option
+// @type: 参见option.h中的eQuicSocketOptionType枚举, 默认值参见constants.h
+int SetQuicSocketOpt(QuicSocket sock, int type, int64_t value);
+
+int GetQuicSocketOpt(QuicSocket sock, int type, int64_t* value);
 
 // poll
 //int QuicPoll(struct pollfd *fds, nfds_t nfds, int timeout);

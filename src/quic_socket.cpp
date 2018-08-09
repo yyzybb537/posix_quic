@@ -234,6 +234,34 @@ ssize_t QuicRead(QuicStream stream, void* data, size_t length)
     return QuicReadv(stream, &iov, 1);
 }
 
+int SetQuicSocketOpt(QuicSocket sock, int type, int64_t value)
+{
+    auto socket = EntryBase::GetFdManager().Get(sock);
+    if (!socket || socket->Category() != EntryCategory::Socket) {
+        DebugPrint(dbg_api, "sock = %d, return = -1, errno = EBADF", sock);
+        errno = EBADF;
+        return -1;
+    }
+
+    ((QuicSocketEntry*)socket.get())->SetOpt(type, value);
+    errno = 0;
+    return 0;
+}
+
+int GetQuicSocketOpt(QuicSocket sock, int type, int64_t* value)
+{
+    auto socket = EntryBase::GetFdManager().Get(sock);
+    if (!socket || socket->Category() != EntryCategory::Socket) {
+        DebugPrint(dbg_api, "sock = %d, return = -1, errno = EBADF", sock);
+        errno = EBADF;
+        return -1;
+    }
+
+    *value = ((QuicSocketEntry*)socket.get())->GetOpt(type);
+    errno = 0;
+    return 0;
+}
+
 // poll
 //int QuicPoll(struct pollfd *fds, nfds_t nfds, int timeout)
 //{
