@@ -1,4 +1,5 @@
 #include "quic_socket.h"
+#include "debug.h"
 #include <string.h>
 #include <stdio.h>
 #include <string>
