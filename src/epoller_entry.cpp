@@ -8,11 +8,47 @@
 
 namespace posix_quic {
 
+
+void QuicEpollerEntry::EpollTrigger::OnTrigger(short int event)
+{
+    if ((event & POLLERR) == 0) return ;
+
+    // mod fd
+    epollEntry->Notify();
+}
+
+void QuicEpollerEntry::Notify()
+{
+    struct epoll_event ev;
+    ev.events = EPOLLOUT | EPOLLET;
+    ev.data.fd = socketPair_[0];
+    ::epoll_ctl(Fd(), EPOLL_CTL_MOD, socketPair_[0], &ev);
+
+    DebugPrint(dbg_event, "Notify epfd = %d", Fd());
+}
+
+void QuicEpollerEntry::EpollTrigger::OnClose(Event* e)
+{
+    epollEntry->Del(e->Fd());
+}
+
 QuicEpollerEntry::QuicEpollerEntry()
 {
     SetFd(epoll_create(10240));
     trigger_.epollfd = Fd();
+    trigger_.epollEntry = this;
     signal(EPIPE, SIG_IGN);
+
+    int res = socketpair(AF_LOCAL, SOCK_STREAM, 0, socketPair_);
+    if (res != 0) {
+        DebugPrint(dbg_error, "socketpair returns %d, errno = %d", res, errno);
+        socketPair_[0] = socketPair_[1] = -1;
+    } else {
+        struct epoll_event ev;
+        ev.events = EPOLLOUT | EPOLLET;
+        ev.data.fd = socketPair_[0];
+        ::epoll_ctl(Fd(), EPOLL_CTL_ADD, socketPair_[0], &ev);
+    }
 }
 
 QuicEpollerEntry::~QuicEpollerEntry()
@@ -28,6 +64,10 @@ QuicEpollerEntry::~QuicEpollerEntry()
         entry->StopWait(&trigger_);
     }
     fds_.clear();
+
+    for (auto pairFd : socketPair_)
+        if (pairFd != -1)
+            ::close(pairFd);
 }
 
 QuicEpollerEntryPtr QuicEpollerEntry::NewQuicEpollerEntry()
@@ -170,7 +210,7 @@ int QuicEpollerEntry::DelInner(int fd)
 
 int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeout)
 {
-    udpEvents_.resize((std::max<size_t>)(udps_.size(), 1));
+    udpEvents_.resize((std::max<size_t>)(udps_.size() + 1, 1));
     udpRecvBuf_.resize(65 * 1024);
     
     int res = Poll(events, maxevents);
@@ -184,6 +224,9 @@ int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeou
     for (int i = 0; i < res; ++i) {
         struct epoll_event & ev = udpEvents_[i];
         int udpFd = ev.data.fd;
+        if (ev.data.fd == socketPair_[0])
+            continue;
+
         if (ev.events & EPOLLIN == 0)
             continue;
 

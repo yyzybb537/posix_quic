@@ -22,11 +22,15 @@ void Event::EventTrigger::Wait(int timeout)
     }
 }
 
-void Event::EventTrigger::Trigger()
+void Event::EventTrigger::Trigger(short int event)
 {
-    std::unique_lock<std::mutex> lock(cvMtx);
-    triggered = true;
-    cv.notify_one();
+    {
+        std::unique_lock<std::mutex> lock(cvMtx);
+        triggered = true;
+        cv.notify_one();
+    }
+
+    OnTrigger(event);
 }
 
 bool Event::StartWait(EventWaiter waiter, EventTrigger * trigger)
@@ -45,13 +49,13 @@ bool Event::StartWait(EventWaiter waiter, EventTrigger * trigger)
     return true;
 }
 
-void Event::Trigger(int event)
+void Event::Trigger(short int event)
 {
     std::unique_lock<std::mutex> lock(mtx_);
     TriggerWithoutLock(event);
 }
 
-void Event::TriggerWithoutLock(int event)
+void Event::TriggerWithoutLock(short int event)
 {
     for (auto & kv : waitings_) {
         EventTrigger * trigger = kv.first;
@@ -59,27 +63,27 @@ void Event::TriggerWithoutLock(int event)
         switch (event) {
             case POLLIN:
                 if (*waiter.events & POLLIN) {
-                    __atomic_fetch_or(waiter.revents, POLLIN, std::memory_order_seq_cst);
-                    trigger->Trigger();
                     DebugPrint(dbg_event, "fd = %d, epfd = %d, trigger event = POLLIN. waiter.revents = %s",
                             Fd(), trigger->epollfd, PollEvent2Str(*waiter.revents));
+                    __atomic_fetch_or(waiter.revents, POLLIN, std::memory_order_seq_cst);
+                    trigger->Trigger(POLLIN);
                 }
                 break;
 
             case POLLOUT:
                 if (*waiter.events & POLLOUT) {
-                    __atomic_fetch_or(waiter.revents, POLLOUT, std::memory_order_seq_cst);
-                    trigger->Trigger();
                     DebugPrint(dbg_event, "fd = %d, epfd = %d, trigger event = POLLOUT. waiter.revents = %s",
                             Fd(), trigger->epollfd, PollEvent2Str(*waiter.revents));
+                    __atomic_fetch_or(waiter.revents, POLLOUT, std::memory_order_seq_cst);
+                    trigger->Trigger(POLLOUT);
                 }
                 break;
 
             case POLLERR:
-                __atomic_fetch_or(waiter.revents, POLLERR, std::memory_order_seq_cst);
-                trigger->Trigger();
                 DebugPrint(dbg_event, "fd = %d, epfd = %d, trigger event = POLLERR. waiter.revents = %s",
                         Fd(), trigger->epollfd, PollEvent2Str(*waiter.revents));
+                __atomic_fetch_or(waiter.revents, POLLERR, std::memory_order_seq_cst);
+                trigger->Trigger(POLLERR);
                 break;
 
             default:
@@ -121,20 +125,19 @@ void Event::ClearWaitingsByClose()
 {
     if (closeTrigger_) return ;
 
-    std::vector<int> epollfds;
     std::unique_lock<std::mutex> lock(mtx_);
+    if (closeTrigger_) return ;
+
+    std::vector<EventTrigger*> closed;
     closeTrigger_ = true;
     for (auto & kv : waitings_) {
-        if (kv.first->epollfd != -1)
-            epollfds.push_back(kv.first->epollfd);
+        closed.push_back(kv.first);
     }
     waitings_.clear();
     lock.unlock();
 
-    for (auto epfd : epollfds) {
-        auto ep = QuicEpollerEntry::GetFdManager().Get(epfd);
-        if (!ep) continue;
-        ep->Del(Fd());
+    for (EventTrigger* trigger : closed) {
+        trigger->OnClose(this);
     }
 }
 

@@ -26,6 +26,14 @@ public:
     // 引用计数
     typedef std::unordered_map<int, long> UdpContainer;
 
+    struct EpollTrigger : public Event::EventTrigger
+    {
+        QuicEpollerEntry * epollEntry;
+
+        void OnTrigger(short int event) override;
+        void OnClose(Event* ) override;
+    };
+
     QuicEpollerEntry();
     ~QuicEpollerEntry();
 
@@ -63,13 +71,16 @@ private:
 
     int DelInner(int fd);
 
+    void Notify();
+
 private:
     std::mutex mtx_;
     FdContainer fds_;
     UdpContainer udps_;
     std::vector<struct epoll_event> udpEvents_;
     std::vector<char> udpRecvBuf_;
-    Event::EventTrigger trigger_;
+    EpollTrigger trigger_;
+    int socketPair_[2];
     HeaderParser headerParser_;
 };
 

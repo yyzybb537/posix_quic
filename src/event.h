@@ -26,12 +26,15 @@ public:
         int epollfd = -1;
 
         void Wait(int timeout);
-        void Trigger();
+        void Trigger(short int event);
+
+        virtual void OnTrigger(short int event) {}
+        virtual void OnClose(Event* ) {}
     };
 
     bool StartWait(EventWaiter waiter, EventTrigger * trigger);
     void StopWait(EventTrigger * trigger);
-    void Trigger(int event);
+    void Trigger(short int event);
 
     void SetReadable(bool b);
     void SetWritable(bool b);
@@ -49,7 +52,7 @@ public:
     std::string GetDebugInfo(int indent);
 
 protected:
-    void TriggerWithoutLock(int event);
+    void TriggerWithoutLock(short int event);
 
     void ClearWaitingsByClose();
 
