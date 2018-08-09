@@ -8,6 +8,12 @@ void PosixQuicPacketTransport::Set(std::shared_ptr<int> udpSocket, QuicSocketAdd
     address_ = address;
 }
 
+void PosixQuicPacketTransport::UpdatePeerAddress(QuicSocketAddress const& address)
+{
+    DebugPrint(dbg_write, "UpdatePeerAddress from %s to %s", address_.ToString().c_str(), address.ToString().c_str());
+    address_ = address;
+}
+
 int PosixQuicPacketTransport::Write(const char* buffer, size_t buf_len)
 {
     if (!udpSocket_) {

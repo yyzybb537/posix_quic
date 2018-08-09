@@ -11,6 +11,8 @@ class PosixQuicPacketTransport
 public:
     void Set(std::shared_ptr<int> udpSocket, QuicSocketAddress const& address);
 
+    void UpdatePeerAddress(QuicSocketAddress const& address);
+
     int Write(const char* buffer, size_t buf_len) override;
 
 private:

@@ -62,12 +62,14 @@ void QuicConnectionVisitor::SetNoAckAlarm()
 }
 
 void QuicConnectionVisitor::Bind(std::mutex * mtx, QuicConnection * connection,
-        QuicSocketOptions * opts, FdBase * parent)
+        QuicSocketOptions * opts, FdBase * parent,
+        std::shared_ptr<PosixQuicPacketTransport> packetTransport)
 {
     mtx_ = mtx;
     connection_ = connection;
     opts_ = opts;
     parent_ = parent;
+    packetTransport_ = packetTransport;
     noAckAlarm_.reset(connection->alarm_factory()->CreateAlarm(new NoAckAlarmDelegate(this)));
 }
 
@@ -151,6 +153,8 @@ void QuicConnectionVisitor::OnPacketHeader(const QuicPacketHeader& header)
 void QuicConnectionVisitor::OnStreamFrame(const QuicStreamFrame& frame)
 {
     DebugPrint(dbg_conn_visitor, "Visitor");
+
+    packetTransport_->UpdatePeerAddress(connection_->peer_address());
 }
 
 // Called when a StopWaitingFrame has been parsed.

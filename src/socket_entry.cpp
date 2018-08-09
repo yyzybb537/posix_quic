@@ -54,7 +54,8 @@ QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry(bool isServer, QuicConnec
     sptr->SetDelegate(sptr.get());
     sptr->connection()->SetAlarmLock(&sptr->mtx_);
     sptr->connection()->set_debug_visitor(&sptr->connectionVisitor_);
-    sptr->connectionVisitor_.Bind(&sptr->mtx_, sptr->connection(), &sptr->opts_, sptr.get());
+    sptr->connectionVisitor_.Bind(&sptr->mtx_, sptr->connection(), &sptr->opts_,
+            sptr.get(), sptr->packetTransport_);
 
     GetFdManager().Put(fd, sptr);
     return sptr;

@@ -3,6 +3,7 @@
 #include "fwd.h"
 #include "net/quic/core/quic_connection.h"
 #include "fd.h"
+#include "packet_transport.h"
 
 namespace posix_quic {
 
@@ -14,7 +15,8 @@ public:
     virtual ~QuicConnectionVisitor();
 
     void Bind(std::mutex * mtx, QuicConnection * connection,
-            QuicSocketOptions * opts, FdBase * parent);
+            QuicSocketOptions * opts, FdBase * parent,
+            std::shared_ptr<PosixQuicPacketTransport> packetTransport);
 
     std::mutex & GetAlarmLock() { return *mtx_; }
 
@@ -129,6 +131,8 @@ private:
     QuicSocketOptions * opts_ = nullptr;
 
     FdBase * parent_ = nullptr;
+
+    std::shared_ptr<PosixQuicPacketTransport> packetTransport_;
 
     std::unique_ptr<QuicAlarm> noAckAlarm_;
 
