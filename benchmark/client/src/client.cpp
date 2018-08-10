@@ -34,7 +34,8 @@ using namespace posix_quic;
 
 std::atomic_long g_qps{0}, g_bytes{0};
 const std::string g_buf(1400, 'a');
-const int g_pipeline = 100;
+const int g_connection = 10;
+const int g_pipeline = 1;
 
 void show() {
     long last_qps = 0;
@@ -143,25 +144,27 @@ int main() {
     QuicEpoller ep = QuicCreateEpoll();
     assert(ep >= 0);
 
-    QuicSocket socket = QuicCreateSocket();
-    assert(socket > 0);
-
     int res;
 
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(9700);
-    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    for (int i = 0; i < g_connection; ++i) {
+        QuicSocket socket = QuicCreateSocket();
+        assert(socket > 0);
 
-    res = QuicConnect(socket, (struct sockaddr*)&addr, sizeof(addr));
-    assert(errno == EINPROGRESS);
-    assert(res == -1);
+        struct sockaddr_in addr;
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(9700);
+        addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
-    struct epoll_event ev;
-    ev.data.fd = socket;
-    ev.events = EPOLLIN | EPOLLOUT;
-    res = QuicEpollCtl(ep, EPOLL_CTL_ADD, socket, &ev);
-    CHECK_RES(res, "epoll_ctl");
+        res = QuicConnect(socket, (struct sockaddr*)&addr, sizeof(addr));
+        assert(errno == EINPROGRESS);
+        assert(res == -1);
+
+        struct epoll_event ev;
+        ev.data.fd = socket;
+        ev.events = EPOLLIN | EPOLLOUT;
+        res = QuicEpollCtl(ep, EPOLL_CTL_ADD, socket, &ev);
+        CHECK_RES(res, "epoll_ctl");
+    }
 
     for (;;) {
         res = doLoop(ep);
