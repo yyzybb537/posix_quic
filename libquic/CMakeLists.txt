@@ -3,6 +3,12 @@
 
  set(CMAKE_CXX_STANDARD 14)
 
+# flags
+if (CMAKE_BUILD_TYPE)
+else()
+    set(CMAKE_BUILD_TYPE RELEASE)
+endif()
+
  if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
      message(STATUS "Setting build type to 'Debug' as none was specified.")
      set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build." FORCE)
@@ -169,8 +175,8 @@
      set(COMMON_C_FLAGS "${COMMON_C_FLAGS} -Wall -fpic")
      set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${COMMON_C_FLAGS}")
      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${COMMON_C_FLAGS} -std=gnu++11")
-     set(CMAKE_C_FLAGS_RELEASE "-DNDEBUG")
-     set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG")
+     set(CMAKE_C_FLAGS_RELEASE "-DNDEBUG -O3")
+     set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3")
      set(CMAKE_C_FLAGS_DEBUG "-g")
      set(CMAKE_CXX_FLAGS_DEBUG "-g")
  endif ()

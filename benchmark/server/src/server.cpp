@@ -24,20 +24,20 @@ using namespace posix_quic;
         }\
     } while (0)
 
-std::atomic_long g_qps{0}, g_bytes{0};
+std::atomic_long g_tps{0}, g_bytes{0};
 
 void show() {
-    long last_qps = 0;
+    long last_tps = 0;
     long last_bytes = 0;
     for (;;) {
         sleep(1);
 
-        long qps = g_qps - last_qps;
+        long tps = g_tps - last_tps;
         long bytes = g_bytes - last_bytes;
-        last_qps = g_qps;
+        last_tps = g_tps;
         last_bytes = g_bytes;
 
-        UserLog("QPS: %ld, Bytes: %ld KB", qps, bytes / 1024);
+        UserLog("TPS: %ld, Bytes: %ld KB", tps, bytes / 1024);
     }
 }
 
@@ -57,7 +57,7 @@ int OnRead(QuicStream fd) {
             return 1;
         }
 
-        ++g_qps;
+        ++g_tps;
         g_bytes += res;
 
 //        UserLog("recv(len=%d): %.*s\n", res, res, buf);

@@ -235,6 +235,7 @@ retry_wait:
             continue;
 
         QuicSocketEntryPtr owner;
+        QuicSocketAddress selfAddress(GetLocalAddress(udpFd));
 
         for (int j = 0; j < 1024; ++j) {
             struct sockaddr_storage addr = {};
@@ -291,7 +292,7 @@ retry_recvfrom:
 
                 QuicSocketEntryPtr socket = QuicSocketEntry::NewQuicSocketEntry(true, connectionId);
                 socket->OnSyn(owner, peerAddress);
-                socket->ProcessUdpPacket(GetLocalAddress(udpFd),
+                socket->ProcessUdpPacket(selfAddress,
                         peerAddress,
                         QuicReceivedPacket(&udpRecvBuf_[0], bytes, QuicClockImpl::getInstance().Now()));
                 continue;
@@ -305,7 +306,7 @@ retry_recvfrom:
 
             QuicSocketEntry* socket = (QuicSocketEntry*)entry.get();
             socket->FlushWrites();
-            socket->ProcessUdpPacket(GetLocalAddress(udpFd),
+            socket->ProcessUdpPacket(selfAddress,
                 peerAddress,
                 QuicReceivedPacket(&udpRecvBuf_[0], bytes, QuicClockImpl::getInstance().Now()));
         }

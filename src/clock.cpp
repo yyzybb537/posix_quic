@@ -1,19 +1,26 @@
 #include "clock.h"
+#include "clock_impl.h"
 
 namespace posix_quic {
 
+static int ClockInitialize() {
+    std::thread(&FastSteadyClock::ThreadRun).detach();
+    return 0;
+}
+
 QuicClockImpl& QuicClockImpl::getInstance()
 {
+    static int ign = ClockInitialize();
+    (void)ign;
+
     static QuicClockImpl obj;
     return obj;
 }
 
 int64_t QuicClockImpl::NowMicroseconds()
 {
-    struct timeval timeNow;
-    gettimeofday(&timeNow, nullptr);
-    int64_t timeNowUSecs = timeNow.tv_sec * 1000000LL + timeNow.tv_usec;
-    return timeNowUSecs;
+    auto tp = FastSteadyClock::now();
+    return std::chrono::duration_cast<std::chrono::microseconds>(tp.time_since_epoch()).count();
 }
 
 QuicTime QuicClockImpl::Now()

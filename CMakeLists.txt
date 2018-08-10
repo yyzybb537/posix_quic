@@ -23,7 +23,7 @@ message("  CMAKE_COMMAND: ${CMAKE_COMMAND}")
 
 #set(CMAKE_CXX_FLAGS -std=gnu++11)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
-set(CMAKE_CXX_FLAGS_RELEASE "-g -O3 -fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS_RELEASE "-DNDEBUG -O3 -fno-strict-aliasing ${CMAKE_CXX_FLAGS}")
 
 message("------------ Cxx flags -------------")
 message("  CMAKE_CXX_FLAGS_${CMAKE_BUILD_TYPE}: ${CMAKE_CXX_FLAGS_${CMAKE_BUILD_TYPE}}")

@@ -32,23 +32,24 @@ using namespace posix_quic;
         }\
     } while (0)
 
-std::atomic_long g_qps{0}, g_bytes{0};
-const std::string g_buf(1400, 'a');
+std::atomic_long g_tps{0}, g_bytes{0};
+const int g_bytesPerReq = 128;
+const std::string g_buf(g_bytesPerReq, 'a');
 const int g_connection = 10;
-const int g_pipeline = 1;
+const int g_pipeline = 200;
 
 void show() {
-    long last_qps = 0;
+    long last_tps = 0;
     long last_bytes = 0;
     for (;;) {
         sleep(1);
 
-        long qps = g_qps - last_qps;
+        long tps = g_tps - last_tps;
         long bytes = g_bytes - last_bytes;
-        last_qps = g_qps;
+        last_tps = g_tps;
         last_bytes = g_bytes;
 
-        UserLog("QPS: %ld, Bytes: %ld KB", bytes / g_buf.size(), bytes / 1024);
+        UserLog("QPS: %ld, TPS: %ld, Bytes: %ld KB", bytes / g_buf.size(), tps, bytes / 1024);
     }
 }
 
@@ -68,7 +69,7 @@ int OnRead(QuicStream fd) {
             return 1;
         }
 
-        ++g_qps;
+        ++g_tps;
         g_bytes += res;
 
 //        UserLog("recv(len=%d): %.*s\n", res, res, buf);
