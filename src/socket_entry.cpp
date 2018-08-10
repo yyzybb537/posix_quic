@@ -224,7 +224,12 @@ int QuicSocketEntry::Close()
     if (socketState_ == QuicSocketState_Closed)
         return 0;
 
+    std::unique_lock<std::mutex> lock(mtx_);
+    if (socketState_ == QuicSocketState_Closed)
+        return 0;
+
     socketState_ = QuicSocketState_Closed;
+    connectionVisitor_.CancelNoAckAlarm();
     if (udpSocket_)
         GetConnectionManager().Delete(*udpSocket_, connection_id(), Fd());
     CloseConnection("");

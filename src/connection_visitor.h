@@ -24,6 +24,8 @@ public:
 
     void SetNoAckAlarm();
 
+    void CancelNoAckAlarm();
+
     // Called when a packet has been sent.
     void OnPacketSent(const SerializedPacket& serialized_packet,
             QuicPacketNumber original_packet_number,
@@ -135,6 +137,8 @@ private:
     std::shared_ptr<PosixQuicPacketTransport> packetTransport_;
 
     std::unique_ptr<QuicAlarm> noAckAlarm_;
+
+    volatile bool canceled_ = false;
 
     QuicTime lastAckTime_;
     QuicTime lastSendTime_;

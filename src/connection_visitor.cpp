@@ -29,6 +29,8 @@ QuicConnectionVisitor::~QuicConnectionVisitor()
 
 void QuicConnectionVisitor::CheckForNoAckTimeout()
 {
+    if (canceled_) return ;
+
     QuicTime::Delta allow_duration = QuicTime::Delta::FromSeconds(opts_->GetOption(sockopt_ack_timeout_secs));
     if (allow_duration.IsZero())
         return ;
@@ -59,6 +61,12 @@ void QuicConnectionVisitor::SetNoAckAlarm()
 
     DebugPrint(dbg_ack_timeout, "fd = %d, secs = %d", parent_->Fd(), secs);
     noAckAlarm_->Update(deadline, QuicTime::Delta::Zero());
+}
+
+void QuicConnectionVisitor::CancelNoAckAlarm()
+{
+    canceled_ = true;
+    noAckAlarm_->Cancel();
 }
 
 void QuicConnectionVisitor::Bind(std::mutex * mtx, QuicConnection * connection,
