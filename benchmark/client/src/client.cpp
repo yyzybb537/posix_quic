@@ -34,6 +34,7 @@ using namespace posix_quic;
 
 std::atomic_long g_qps{0}, g_bytes{0};
 const std::string g_buf(1400, 'a');
+const int g_pipeline = 100;
 
 void show() {
     long last_qps = 0;
@@ -46,7 +47,7 @@ void show() {
         last_qps = g_qps;
         last_bytes = g_bytes;
 
-        UserLog("QPS: %ld, Bytes: %ld KB", qps, bytes / 1024);
+        UserLog("QPS: %ld, Bytes: %ld KB", bytes / g_buf.size(), bytes / 1024);
     }
 }
 
@@ -103,8 +104,10 @@ int doLoop(QuicEpoller ep) {
                 res = QuicEpollCtl(ep, EPOLL_CTL_ADD, stream, &ev);
                 CHECK_RES(res, "epoll_ctl");
 
-                res = QuicWrite(stream, g_buf.c_str(), g_buf.size(), false);
-                CHECK_RES(res, "write");
+                for (int i = 0; i < g_pipeline; ++i) {
+                    res = QuicWrite(stream, g_buf.c_str(), g_buf.size(), false);
+                    CHECK_RES(res, "write");
+                }
             }
         }
 

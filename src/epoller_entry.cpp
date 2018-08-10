@@ -216,8 +216,12 @@ int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeou
     int res = Poll(events, maxevents);
     if (res > 0) return res;
 
+retry_wait:
     res = epoll_wait(Fd(), &udpEvents_[0], udpEvents_.size(), timeout);
     if (res < 0) {
+        if (errno == EINTR)
+            goto retry_wait;
+
         return res;
     }
 
@@ -346,7 +350,7 @@ FdManager<QuicEpollerEntryPtr> & QuicEpollerEntry::GetFdManager()
 QuicSocketAddress QuicEpollerEntry::GetLocalAddress(UdpSocket udpSocket)
 {
     struct sockaddr_storage addr = {};
-    socklen_t addrLen;
+    socklen_t addrLen = sizeof(addr);
     int res = getsockname(udpSocket, (struct sockaddr*)&addr, &addrLen); 
     if (res != 0) return QuicSocketAddress();
     return QuicSocketAddress(addr);

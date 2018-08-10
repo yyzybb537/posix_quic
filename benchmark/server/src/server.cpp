@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <atomic>
 #include <thread>
+#include "../../profiler.h"
 
 using namespace posix_quic;
 
@@ -146,6 +147,10 @@ int doLoop(QuicEpoller ep, QuicSocket listenSock) {
 
 int main() {
 //    debug_mask = dbg_all & ~dbg_timer;
+    debug_mask = dbg_close;
+
+    GProfiler::Initialize();
+
     std::thread(&show).detach();
     
     QuicEpoller ep = QuicCreateEpoll();

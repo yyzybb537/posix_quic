@@ -112,7 +112,7 @@ void Event::SetWritable(bool b)
 }
 void Event::SetError(int err, int quicErr)
 {
-    DebugPrint(dbg_event, "fd = %d, SetError(err=%d, quicErr=%d) now-error=%d",
+    DebugPrint(dbg_event | dbg_close, "fd = %d, SetError(err=%d, quicErr=%d) now-error=%d",
             Fd(), err, quicErr, error);
     if (error == 0) {
         error = err;

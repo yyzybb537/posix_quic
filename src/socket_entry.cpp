@@ -302,7 +302,7 @@ void QuicSocketEntry::ProcessUdpPacket(const QuicSocketAddress& self_address,
         const QuicSocketAddress& peer_address,
         const QuicReceivedPacket& packet)
 {
-    DebugPrint(dbg_connect | dbg_accept | dbg_write | dbg_read | dbg_close,
+    DebugPrint(dbg_connect | dbg_accept | dbg_write | dbg_read,
             "fd = %d, packet length = %d", Fd(), (int)packet.length());
     std::unique_lock<std::mutex> lock(mtx_);
     QuartcSession::ProcessUdpPacket(self_address, peer_address, packet);

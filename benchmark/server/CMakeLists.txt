@@ -46,4 +46,4 @@ link_directories(${PROJECT_SOURCE_DIR}/../../build/libquic/third_party/protobuf/
 
 # target
 add_executable(${TARGET} ${LIST_SRC})
-target_link_libraries(${TARGET} posix_quic quic ssl crypto decrepit protobuf -pthread -Wl,--whole-archive -lpthread -Wl,--no-whole-archive dl -static)
+target_link_libraries(${TARGET} posix_quic quic ssl crypto decrepit protobuf profiler -pthread -Wl,--whole-archive -lpthread -Wl,--no-whole-archive dl -static)
