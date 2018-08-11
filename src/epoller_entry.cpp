@@ -198,6 +198,7 @@ int QuicEpollerEntry::DelInner(int fd)
     assert(!!udpSocket);
 
     auto udpItr = udps_.find(*udpSocket);
+    assert(udpItr != udps_.end());
     if (--udpItr->second == 0) {
         epoll_ctl(Fd(), EPOLL_CTL_DEL, *udpSocket, nullptr);
         udps_.erase(udpItr);
@@ -210,7 +211,8 @@ int QuicEpollerEntry::DelInner(int fd)
 
 int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeout)
 {
-    udpEvents_.resize((std::max<size_t>)(udps_.size() + 1, 1));
+    size_t udpSize = std::max<size_t>(udps_.size() + 1, 1);
+    udpEvents_.resize(std::min<size_t>(udpSize, 10240));
     udpRecvBuf_.resize(65 * 1024);
     
     int res = Poll(events, maxevents);
