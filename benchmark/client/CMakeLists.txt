@@ -36,6 +36,7 @@ include_directories(${PROJECT_SOURCE_DIR}/../../src)
 include_directories(${PROJECT_SOURCE_DIR}/../../libquic)
 include_directories(${PROJECT_SOURCE_DIR}/../../libquic/third_party/boringssl/src/include)
 include_directories(${PROJECT_SOURCE_DIR}/../../libquic/third_party/protobuf/src)
+include_directories(${PROJECT_SOURCE_DIR}/../../simple)
 
 link_directories(${PROJECT_SOURCE_DIR}/../../build)
 link_directories(${PROJECT_SOURCE_DIR}/../../build/libquic)
@@ -43,7 +44,8 @@ link_directories(${PROJECT_SOURCE_DIR}/../../build/libquic/third_party/boringssl
 link_directories(${PROJECT_SOURCE_DIR}/../../build/libquic/third_party/boringssl/src/crypto)
 link_directories(${PROJECT_SOURCE_DIR}/../../build/libquic/third_party/boringssl/src/decrepit)
 link_directories(${PROJECT_SOURCE_DIR}/../../build/libquic/third_party/protobuf/src)
+link_directories(${PROJECT_SOURCE_DIR}/../../build/simple)
 
 # target
 add_executable(${TARGET} ${LIST_SRC})
-target_link_libraries(${TARGET} posix_quic quic ssl crypto decrepit protobuf -pthread -Wl,--whole-archive -lpthread -Wl,--no-whole-archive dl -static)
+target_link_libraries(${TARGET} simple_quic posix_quic quic ssl crypto decrepit protobuf -pthread -Wl,--whole-archive -lpthread -Wl,--no-whole-archive dl -static)

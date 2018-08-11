@@ -1,4 +1,4 @@
-#include "quic_socket.h"
+#include "simple_quic.h"
 #include "debug.h"
 #include <unistd.h>
 #include <string.h>
@@ -13,30 +13,17 @@
 #include <unistd.h>
 #include <atomic>
 #include <thread>
+#include <vector>
 
 using namespace posix_quic;
-
-#define CHECK_RES(res, api) \
-    do {\
-        if (res < 0) {\
-            perror(api " error");\
-            return 1;\
-        }\
-    } while (0)
-
-#define CHECK_RES_ALLOW_EAGAIN(res, api) \
-    do {\
-        if (res < 0 && errno != EAGAIN) {\
-            perror(api " error");\
-            return 1;\
-        }\
-    } while (0)
+using namespace posix_quic::simple;
 
 std::atomic_long g_tps{0}, g_bytes{0};
 const int g_bytesPerReq = 128;
-const std::string g_buf(g_bytesPerReq, 'a');
-const int g_connection = 10;
-const int g_pipeline = 200;
+const int g_connection = 100;
+const int g_pipeline = 1;
+
+long g_bufferdSlices = 0;
 
 void show() {
     long last_tps = 0;
@@ -49,127 +36,92 @@ void show() {
         last_tps = g_tps;
         last_bytes = g_bytes;
 
-        UserLog("QPS: %ld, TPS: %ld, Bytes: %ld KB", bytes / g_buf.size(), tps, bytes / 1024);
+        UserLog("QPS: %ld, TPS: %ld, Bytes: %ld KB    BufferdSlices: %ld",
+                bytes / g_bytesPerReq, tps, bytes / 1024, g_bufferdSlices);
+
+        g_bufferdSlices = 0;
     }
 }
 
-int OnRead(QuicStream fd) {
-    int res;
-    char buf[10240];
-    for (;;) {
-        res = QuicRead(fd, buf, sizeof(buf));
-        if (res < 0) {
-            if (errno == EAGAIN)
-                return 0;
+class ClientConnection : public Connection
+{
+    using Connection::Connection;
 
-            QuicCloseStream(fd);
-            return 1;
-        } else if (res == 0) {
-            QuicStreamShutdown(fd, SHUT_WR);
-            return 1;
+    std::vector<char> buf_;
+    size_t bufLen_ = 0;
+    int packetIdx_ = 0;
+
+public:
+    virtual Connection* NewConnection(IOService* ios, QuicSocket socket) {
+        return new ClientConnection(ios, socket);
+    }
+
+    // only called by client peer.
+    virtual void OnConnected() {
+        buf_.resize(g_bytesPerReq);
+
+        for (int i = 0; i < g_pipeline; ++i) {
+            std::string g_buf(g_bytesPerReq, 'a');
+            *reinterpret_cast<int*>(&g_buf[0]) = i;
+            Write(g_buf.c_str(), g_buf.size(), PublicStream);
         }
+    }
 
+    // only called by server peer.
+    virtual void OnAcceptSocket(Connection* connection) {}
+
+    virtual void OnRecv(const char* data, size_t len, QuicStream stream) {
         ++g_tps;
-        g_bytes += res;
+        g_bytes += len;
 
-//        UserLog("recv(len=%d): %.*s\n", res, res, buf);
-
-        res = QuicWrite(fd, buf, res, false);
-//        CHECK_RES(res, "write");
-    }
-}
-
-int doLoop(QuicEpoller ep) {
-    struct epoll_event evs[1024];
-    int n = QuicEpollWait(ep, evs, sizeof(evs)/sizeof(struct epoll_event), 6000);
-    CHECK_RES(n, "epoll_wait");
-
-    int res;
-    for (int i = 0; i < n; i++) {
-        struct epoll_event & ev = evs[i];
-        int fd = ev.data.fd;
-        EntryCategory category = GetCategory(fd);
-
-//        UserLog("QuicEpoller trigger: fd = %d, category = %s, events = %s", fd, EntryCategory2Str((int)category), EpollEvent2Str(ev.events));
-
-        if (ev.events & EPOLLOUT) {
-            // connected
-            UserLog("Connected.\n");
-
-            if (category == EntryCategory::Socket) {
-                QuicStream stream = QuicCreateStream(fd);
-                assert(stream > 0);
-
-                struct epoll_event ev;
-                ev.data.fd = stream;
-                ev.events = EPOLLIN;
-                res = QuicEpollCtl(ep, EPOLL_CTL_ADD, stream, &ev);
-                CHECK_RES(res, "epoll_ctl");
-
-                for (int i = 0; i < g_pipeline; ++i) {
-                    res = QuicWrite(stream, g_buf.c_str(), g_buf.size(), false);
-                    CHECK_RES(res, "write");
-                }
+        size_t bytes = len;
+        while (bytes) {
+            size_t copyable = std::min(g_bytesPerReq - bufLen_, bytes);
+            memcpy(&buf_[bufLen_], data + len - bytes, copyable);
+            bufLen_ += copyable;
+            bytes -= copyable;
+            if (bufLen_ == g_bytesPerReq) {
+                int idx = *(int*)&buf_[0];
+//                UserLog("Recv idx: %d", idx);
+                assert(idx == packetIdx_);
+                ++packetIdx_;
+                if (packetIdx_ >= g_pipeline)
+                    packetIdx_ = 0;
+                bufLen_ = 0;
             }
         }
 
-        if (ev.events & EPOLLIN) {
-//            UserLog("QuicDebugInfo:\n%s\n", GlobalDebugInfo(src_all).c_str());
-
-            if (category == EntryCategory::Socket) {
-                // client needn't accept
-            } else if (category == EntryCategory::Stream) {
-                // stream, recv data.
-                OnRead(fd);
-            }
-        }
-
-        if (ev.events & EPOLLERR) {
-            if (category == EntryCategory::Socket) {
-                UserLog("Close Socket fd=%d\n", fd);
-                QuicCloseSocket(fd);
-            } else if (category == EntryCategory::Stream) {
-                UserLog("Close Stream fd=%d\n", fd);
-                QuicCloseStream(fd);
-            } 
-        }
+        Write(data, len, stream);
+        g_bufferdSlices = std::max(g_bufferdSlices, BufferedSliceCount(stream));
     }
 
-    return 0;
-}
+    virtual void OnClose(int sysError, int quicError, bool bFromRemote) {
+        UserLog("Close Socket fd=%d closeByPeer:%d\n", Native(), bFromRemote);
+        delete this;
+    }
+
+    virtual void OnStreamClose(int sysError, int quicError, QuicStream stream) {
+        UserLog("Close Stream fd=%d\n", stream);
+    }
+};
 
 int main() {
 //    debug_mask = dbg_all & ~dbg_timer;
+//    debug_mask = dbg_simple;
+
     std::thread(&show).detach();
 
-    QuicEpoller ep = QuicCreateEpoll();
-    assert(ep >= 0);
+    IOService ios;
 
-    int res;
+    struct sockaddr_in addr;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(9700);
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
     for (int i = 0; i < g_connection; ++i) {
-        QuicSocket socket = QuicCreateSocket();
-        assert(socket > 0);
-
-        struct sockaddr_in addr;
-        addr.sin_family = AF_INET;
-        addr.sin_port = htons(9700);
-        addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-        res = QuicConnect(socket, (struct sockaddr*)&addr, sizeof(addr));
-        assert(errno == EINPROGRESS);
-        assert(res == -1);
-
-        struct epoll_event ev;
-        ev.data.fd = socket;
-        ev.events = EPOLLIN | EPOLLOUT;
-        res = QuicEpollCtl(ep, EPOLL_CTL_ADD, socket, &ev);
-        CHECK_RES(res, "epoll_ctl");
+        ClientConnection* c = new ClientConnection(&ios);
+        c->Connect((struct sockaddr*)&addr, sizeof(addr));
     }
 
-    for (;;) {
-        res = doLoop(ep);
-        if (res != 0)
-            return res;
-    }
+    ios.RunLoop();
 }
