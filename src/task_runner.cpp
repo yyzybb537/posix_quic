@@ -90,6 +90,9 @@ QuicTaskRunnerProxy::Schedule(Task* task, uint64_t delay_ms)
     int64_t deadline = QuicClockImpl::getInstance().NowMicroseconds() / 1000 + delay_ms;
     StoragePtr storage(new Storage(task, deadline, this));
     storages_[storage.get()] = storage;
+    if (runner_) {
+        storage->link_ = runner_->Schedule(storage->task_, delay_ms);
+    }
     return std::unique_ptr<QuartcTaskRunnerInterface::ScheduledTask>(
             static_cast<QuartcTaskRunnerInterface::ScheduledTask*>(
                 new ProxyScheduledTask(storage)));
