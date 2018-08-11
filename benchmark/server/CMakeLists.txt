@@ -48,4 +48,5 @@ link_directories(${PROJECT_SOURCE_DIR}/../../build/simple)
 
 # target
 add_executable(${TARGET} ${LIST_SRC})
-target_link_libraries(${TARGET} simple_quic posix_quic quic ssl crypto decrepit protobuf profiler -pthread -Wl,--whole-archive -lpthread -Wl,--no-whole-archive dl -static)
+target_link_libraries(${TARGET} simple_quic posix_quic quic ssl crypto decrepit protobuf -pthread -Wl,--whole-archive -lpthread -Wl,--no-whole-archive dl -static)
+#target_link_libraries(${TARGET} simple_quic posix_quic quic ssl crypto decrepit protobuf profiler -pthread -Wl,--whole-archive -lpthread -Wl,--no-whole-archive dl -static)

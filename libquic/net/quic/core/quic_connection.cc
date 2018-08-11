@@ -84,7 +84,6 @@ class AckAlarmDelegate : public QuicAlarm::Delegate {
       : connection_(connection) {}
 
   void OnAlarm() override {
-    std::unique_lock<std::mutex> lock(connection_->GetAlarmLock());
     DCHECK(connection_->ack_frame_updated());
     QuicConnection::ScopedPacketFlusher flusher(connection_,
                                                 QuicConnection::SEND_ACK);
@@ -104,10 +103,7 @@ class RetransmissionAlarmDelegate : public QuicAlarm::Delegate {
   explicit RetransmissionAlarmDelegate(QuicConnection* connection)
       : connection_(connection) {}
 
-  void OnAlarm() override { 
-      std::unique_lock<std::mutex> lock(connection_->GetAlarmLock());
-      connection_->OnRetransmissionTimeout(); 
-  }
+  void OnAlarm() override { connection_->OnRetransmissionTimeout(); }
 
  private:
   QuicConnection* connection_;
@@ -122,10 +118,7 @@ class SendAlarmDelegate : public QuicAlarm::Delegate {
   explicit SendAlarmDelegate(QuicConnection* connection)
       : connection_(connection) {}
 
-  void OnAlarm() override { 
-      std::unique_lock<std::mutex> lock(connection_->GetAlarmLock());
-      connection_->WriteAndBundleAcksIfNotBlocked(); 
-  }
+  void OnAlarm() override { connection_->WriteAndBundleAcksIfNotBlocked(); }
 
  private:
   QuicConnection* connection_;
@@ -138,10 +131,7 @@ class PathDegradingAlarmDelegate : public QuicAlarm::Delegate {
   explicit PathDegradingAlarmDelegate(QuicConnection* connection)
       : connection_(connection) {}
 
-  void OnAlarm() override { 
-      std::unique_lock<std::mutex> lock(connection_->GetAlarmLock());
-      connection_->OnPathDegradingTimeout(); 
-  }
+  void OnAlarm() override { connection_->OnPathDegradingTimeout(); }
 
  private:
   QuicConnection* connection_;
@@ -154,10 +144,7 @@ class TimeoutAlarmDelegate : public QuicAlarm::Delegate {
   explicit TimeoutAlarmDelegate(QuicConnection* connection)
       : connection_(connection) {}
 
-  void OnAlarm() override { 
-      std::unique_lock<std::mutex> lock(connection_->GetAlarmLock());
-      connection_->CheckForTimeout(); 
-  }
+  void OnAlarm() override { connection_->CheckForTimeout(); }
 
  private:
   QuicConnection* connection_;
@@ -170,10 +157,7 @@ class PingAlarmDelegate : public QuicAlarm::Delegate {
   explicit PingAlarmDelegate(QuicConnection* connection)
       : connection_(connection) {}
 
-  void OnAlarm() override { 
-      std::unique_lock<std::mutex> lock(connection_->GetAlarmLock());
-      connection_->OnPingTimeout(); 
-  }
+  void OnAlarm() override { connection_->OnPingTimeout(); }
 
  private:
   QuicConnection* connection_;
@@ -186,10 +170,7 @@ class MtuDiscoveryAlarmDelegate : public QuicAlarm::Delegate {
   explicit MtuDiscoveryAlarmDelegate(QuicConnection* connection)
       : connection_(connection) {}
 
-  void OnAlarm() override { 
-      std::unique_lock<std::mutex> lock(connection_->GetAlarmLock());
-      connection_->DiscoverMtu(); 
-  }
+  void OnAlarm() override { connection_->DiscoverMtu(); }
 
  private:
   QuicConnection* connection_;
@@ -202,10 +183,7 @@ class RetransmittableOnWireAlarmDelegate : public QuicAlarm::Delegate {
   explicit RetransmittableOnWireAlarmDelegate(QuicConnection* connection)
       : connection_(connection) {}
 
-  void OnAlarm() override { 
-      std::unique_lock<std::mutex> lock(connection_->GetAlarmLock());
-      connection_->OnPingTimeout(); 
-  }
+  void OnAlarm() override { connection_->OnPingTimeout(); }
 
  private:
   QuicConnection* connection_;

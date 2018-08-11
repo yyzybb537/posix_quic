@@ -13,6 +13,8 @@ public:
 
     int64_t NowMicroseconds() override;
 
+    int64_t NowMS() { return NowMicroseconds() / 1000; }
+
     QuicTime Now();
 };
 

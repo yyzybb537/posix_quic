@@ -22,7 +22,6 @@
 #include <map>
 #include <memory>
 #include <vector>
-#include <mutex>
 
 #include "base/macros.h"
 #include "net/quic/core/crypto/quic_decrypter.h"
@@ -335,13 +334,6 @@ class QUIC_EXPORT_PRIVATE QuicConnection
                  Perspective perspective,
                  const ParsedQuicVersionVector& supported_versions);
   ~QuicConnection() override;
-
-  void SetAlarmLock(std::mutex* mtx) { alarm_mtx_ = mtx; }
-
-  std::mutex& GetAlarmLock() {
-      assert(alarm_mtx_);
-      return *alarm_mtx_;
-  }
 
   // Sets connection parameters from the supplied |config|.
   void SetFromConfig(const QuicConfig& config);
@@ -1329,8 +1321,6 @@ class QUIC_EXPORT_PRIVATE QuicConnection
 
   // Latched value of quic_reloadable_flag_quic_enable_server_proxy.
   const bool enable_server_proxy_;
-
-  std::mutex *alarm_mtx_ = nullptr;
 
   DISALLOW_COPY_AND_ASSIGN(QuicConnection);
 };

@@ -10,9 +10,10 @@ Connection::Stream::Stream(Connection * connection, QuicStream stream)
     ctx_.isSocket = false;
     ctx_.connection = connection;
     ctx_.stream = stream;
+    ctx_.id = connection->ios_->AddContext(&ctx_);
 
     struct epoll_event ev;
-    ev.data.ptr = &ctx_;
+    ev.data.u64 = ctx_.id;
     ev.events = EPOLLIN | EPOLLOUT;
     int res = QuicEpollCtl(connection->ios_->Native(), EPOLL_CTL_ADD, stream, &ev);
     DebugPrint(dbg_simple, "fd = %d, Add stream = %d into service. returns %d",
@@ -41,6 +42,15 @@ Connection::Connection(IOService* ios, QuicSocket socket)
     sockCtx_.connection = this;
 
     AddIntoService();
+}
+
+Connection::~Connection()
+{
+    Close();
+    
+    if (sockCtx_.id) {
+        ios_->DelContext(sockCtx_.id);
+    }
 }
 
 int Connection::Connect(const struct sockaddr* addr, socklen_t addrLen)
@@ -114,6 +124,10 @@ long Connection::BufferedSliceCount(QuicStream stream)
 Connection::Stream::~Stream()
 {
     Close();
+
+    if (ctx_.id) {
+        ctx_.connection->ios_->DelContext(ctx_.id);
+    }
 }
 
 void Connection::Stream::Close()
@@ -217,13 +231,13 @@ Connection::StreamPtr Connection::GetStream(QuicStream stream)
     return StreamPtr();
 }
 
-void Connection::OnCanRead(QuicStream stream)
+bool Connection::OnCanRead(QuicStream stream)
 {
     DebugPrint(dbg_simple, "fd = %d, stream = %d", Native(), stream);
 
     if (stream == -1) {
         this->OnAccept();
-        return ;
+        return true;
     }
 
     char buf[10240];
@@ -231,27 +245,28 @@ void Connection::OnCanRead(QuicStream stream)
         int res = QuicRead(stream, buf, sizeof(buf));
         if (res < 0) {
             if (errno == EAGAIN)
-                return ;
+                return true;
 
             DebugPrint(dbg_simple, "fd = %d, stream = %d, QuicRead errno = %d, close stream.",
                     Native(), stream, errno);
             StreamPtr streamPtr = GetStream(stream);
             if (streamPtr)
                 streamPtr->Close();
-            return ;
+            return false;
         } else if (res == 0) {
             DebugPrint(dbg_simple, "fd = %d, stream = %d, QuicRead returns 0, shutdown stream.",
                     Native(), stream);
             QuicStreamShutdown(stream, SHUT_WR);
-            return ;
+            return true;
         }
 
         DebugPrint(dbg_simple, "fd = %d, recv-length = %d", Native(), res);
         this->OnRecv(buf, res, stream);
     }
+    return true;
 }
 
-void Connection::OnCanWrite(QuicStream stream)
+bool Connection::OnCanWrite(QuicStream stream)
 {
     DebugPrint(dbg_simple, "fd = %d, stream = %d", Native(), stream);
 
@@ -260,35 +275,39 @@ void Connection::OnCanWrite(QuicStream stream)
             connected_ = true;
             this->OnConnected();
         }
-        return ;
+        return true;
     }
 
     StreamPtr streamPtr = GetStream(stream);
     if (streamPtr)
         streamPtr->WriteBufferedData();
+    return true;
 }
 
-void Connection::OnError(QuicStream stream)
+bool Connection::OnError(QuicStream stream)
 {
     DebugPrint(dbg_simple, "fd = %d, stream = %d", Native(), stream);
 
     int sysError = 0, quicError = 0, bFromRemote = false;
 
     if (stream == -1) {
-        if (closed_) return ;
+        streams_.clear();
 
+        if (closed_) return false;
         closed_ = true;
         GetQuicError(socket_, &sysError, &quicError, &bFromRemote);
         QuicCloseSocket(socket_);
         OnClose(sysError, quicError, bFromRemote);
-        return ;
+        return false;
     }
 
     StreamPtr streamPtr = GetStream(stream);
     if (streamPtr) {
         streamPtr->Close();
         streams_.erase(stream);
+        return false;
     }
+    return true;
 }
 
 void Connection::Stream::WriteBufferedData()
@@ -315,8 +334,10 @@ void Connection::Stream::WriteBufferedData()
 
 int Connection::AddIntoService()
 {
+    sockCtx_.id = ios_->AddContext(&sockCtx_);
+
     struct epoll_event ev;
-    ev.data.ptr = &sockCtx_;
+    ev.data.u64 = sockCtx_.id;
     ev.events = EPOLLIN | EPOLLOUT;
     int res = QuicEpollCtl(ios_->Native(), EPOLL_CTL_ADD, socket_, &ev);
     DebugPrint(dbg_simple, "fd = %d, AddIntoService returns %d", Native(), res);

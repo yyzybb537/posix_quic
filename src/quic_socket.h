@@ -8,6 +8,8 @@
  * 要使用QuicEpoller监听, 否则无法正常收发数据
  *   4.QuicEpoller也是一个普通的epoll fd, 可以加入其它的epoll fd中监听, 
  * 触发EPOLLIN后再调用QuicEpollWait, 以便于和已有的epoll结合起来使用.
+ *   5.一个QuicSocket同一时间只能加入一个QuicEpoller, 
+ * QuicStream必须和所属的QuicSocket加入同一个QuicEpoller
  *
  *
 */

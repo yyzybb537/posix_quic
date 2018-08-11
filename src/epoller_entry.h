@@ -6,6 +6,7 @@
 #include "entry.h"
 #include <sys/epoll.h>
 #include "header_parser.h"
+#include "task_runner.h"
 
 namespace posix_quic {
 
@@ -82,6 +83,7 @@ private:
     EpollTrigger trigger_;
     int socketPair_[2];
     HeaderParser headerParser_;
+    QuicTaskRunner taskRunner_;
 };
 
 } // namespace posix_quic

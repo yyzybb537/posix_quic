@@ -1,6 +1,7 @@
 #pragma once
 
 #include "debug.h"
+#include <mutex>
 
 namespace posix_quic {
 namespace simple {

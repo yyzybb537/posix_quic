@@ -127,8 +127,17 @@ int QuicEpollerEntry::AddInner(int fd, struct epoll_event * event)
     if (!udpSocket) {
         // QuicSocket必须已经有了对应的udp socket才能加入Epoller.
         // 自行创建的QuicSocket, Bind后就可以了.
+        entry->StopWait(&trigger_);
         errno = EINVAL;
         return -1;
+    }
+
+    if (entry->Category() == EntryCategory::Socket) {
+        if (!((QuicSocketEntry*)entry.get())->GetQuicTaskRunnerProxy()->Link(&taskRunner_)) {
+            entry->StopWait(&trigger_);
+            errno = EBUSY;
+            return -1;
+        }
     }
 
     auto udpItr = udps_.find(*udpSocket);
@@ -206,6 +215,11 @@ int QuicEpollerEntry::DelInner(int fd)
 
     entry->StopWait(&trigger_);
     fds_.erase(itr);
+
+    if (entry->Category() == EntryCategory::Socket) {
+        ((QuicSocketEntry*)entry.get())->GetQuicTaskRunnerProxy()->Unlink();
+    }
+
     return 0;
 }
 
@@ -218,13 +232,26 @@ int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeou
     int res = Poll(events, maxevents);
     if (res > 0) return res;
 
-retry_wait:
-    res = epoll_wait(Fd(), &udpEvents_[0], udpEvents_.size(), timeout);
-    if (res < 0) {
-        if (errno == EINTR)
-            goto retry_wait;
+    int64_t deadline = QuicClockImpl::getInstance().NowMS() + timeout;
 
-        return res;
+    for (;;) {
+        taskRunner_.RunOnce();
+
+        int64_t now = QuicClockImpl::getInstance().NowMS();
+        int64_t timeRemain = deadline > now ? deadline - now : 0;
+        int64_t onceTimeout = std::min<int64_t>(timeRemain, 10);
+
+retry_wait:
+        res = epoll_wait(Fd(), &udpEvents_[0], udpEvents_.size(), onceTimeout);
+        if (res < 0) {
+            if (errno == EINTR)
+                goto retry_wait;
+
+            return res;
+        }
+
+        if (res > 0) break;
+        if (res == 0 && onceTimeout == 0) break;
     }
 
     for (int i = 0; i < res; ++i) {
@@ -307,7 +334,6 @@ retry_recvfrom:
             assert(entry->Category() == EntryCategory::Socket);
 
             QuicSocketEntry* socket = (QuicSocketEntry*)entry.get();
-            socket->FlushWrites();
             socket->ProcessUdpPacket(selfAddress,
                 peerAddress,
                 QuicReceivedPacket(&udpRecvBuf_[0], bytes, QuicClockImpl::getInstance().Now()));

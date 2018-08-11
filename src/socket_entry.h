@@ -11,6 +11,8 @@
 #include "connection_manager.h"
 #include "net/quic/quartc/quartc_session_interface.h"
 #include "connection_visitor.h"
+#include "task_runner.h"
+#include "session.h"
 
 namespace posix_quic {
 
@@ -18,11 +20,11 @@ namespace posix_quic {
 class QuicSocketEntry
     : public EntryBase,
     public std::enable_shared_from_this<QuicSocketEntry>,
-    public QuartcSession,
     private QuartcSessionInterface::Delegate
 {
 public:
-    using QuartcSession::QuartcSession;
+    explicit QuicSocketEntry(QuicSocketSession * session);
+    ~QuicSocketEntry();
 
     EntryCategory Category() const override { return EntryCategory::Socket; }
 
@@ -76,16 +78,17 @@ public:
     // --------------------------------
     std::shared_ptr<int> NativeUdpFd() const override;
 
+    QuicTaskRunnerProxy* GetQuicTaskRunnerProxy() { return taskRunnerProxy_.get(); }
+
     // --------------------------------
     // Called in epoll trigger loop
     void ProcessUdpPacket(const QuicSocketAddress& self_address,
             const QuicSocketAddress& peer_address,
-            const QuicReceivedPacket& packet) override;
+            const QuicReceivedPacket& packet);
     // --------------------------------
 
     QuartcStreamPtr GetQuartcStream(QuicStreamId streamId);
 
-    static QuartcFactory& GetQuartcFactory();
     static QuicSocketEntryPtr NewQuicSocketEntry(bool isServer, QuicConnectionId id = INVALID_QUIC_CONNECTION_ID);
     static void DeleteQuicSocketEntry(QuicSocketEntryPtr ptr);
 
@@ -115,6 +118,8 @@ private:
 private:
     std::recursive_mutex mtx_;
 
+    std::shared_ptr<QuicSocketSession> impl_;
+
     std::shared_ptr<int> udpSocket_;
     QuicSocketState socketState_ = QuicSocketState_None;
 
@@ -126,7 +131,11 @@ private:
     std::mutex acceptStreamsMtx_;
     std::list<QuicStreamEntryPtr> acceptStreams_;
 
+    std::shared_ptr<QuartcFactory> factory_;
+
     std::shared_ptr<PosixQuicPacketTransport> packetTransport_;
+
+    std::shared_ptr<QuicTaskRunnerProxy> taskRunnerProxy_;
 
     QuicSocketOptions opts_;
 

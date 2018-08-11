@@ -14,11 +14,9 @@ public:
     explicit QuicConnectionVisitor();
     virtual ~QuicConnectionVisitor();
 
-    void Bind(std::recursive_mutex * mtx, QuicConnection * connection,
+    void Bind(QuicConnection * connection,
             QuicSocketOptions * opts, FdBase * parent,
             std::shared_ptr<PosixQuicPacketTransport> packetTransport);
-
-    std::recursive_mutex & GetAlarmLock() { return *mtx_; }
 
     void CheckForNoAckTimeout();
 
@@ -126,8 +124,6 @@ private:
     void OnRttChanged(QuicTime::Delta rtt) const override;
 
 private:
-    std::recursive_mutex * mtx_ = nullptr;
-
     QuicConnection* connection_ = nullptr;
 
     QuicSocketOptions * opts_ = nullptr;
@@ -137,8 +133,6 @@ private:
     std::shared_ptr<PosixQuicPacketTransport> packetTransport_;
 
     std::unique_ptr<QuicAlarm> noAckAlarm_;
-
-    volatile bool canceled_ = false;
 
     QuicTime lastAckTime_;
     QuicTime lastSendTime_;

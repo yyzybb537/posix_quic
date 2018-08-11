@@ -96,12 +96,13 @@ public:
     }
 
     virtual void OnClose(int sysError, int quicError, bool bFromRemote) {
-        UserLog("Close Socket fd=%d closeByPeer:%d\n", Native(), bFromRemote);
+        UserLog("Close Socket fd=%d sysErr=%d, quicErr=%d, closeByPeer:%d\n",
+                Native(), sysError, quicError, bFromRemote);
         delete this;
     }
 
     virtual void OnStreamClose(int sysError, int quicError, QuicStream stream) {
-        UserLog("Close Stream fd=%d\n", stream);
+//        UserLog("Close Stream fd=%d\n", stream);
     }
 };
 

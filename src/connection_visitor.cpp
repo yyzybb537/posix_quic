@@ -9,7 +9,6 @@ public:
         : visitor_(visitor) {}
 
     void OnAlarm() override {
-        std::unique_lock<std::recursive_mutex> lock(visitor_->GetAlarmLock());
         visitor_->CheckForNoAckTimeout();
     }
 
@@ -29,8 +28,6 @@ QuicConnectionVisitor::~QuicConnectionVisitor()
 
 void QuicConnectionVisitor::CheckForNoAckTimeout()
 {
-    if (canceled_) return ;
-
     QuicTime::Delta allow_duration = QuicTime::Delta::FromSeconds(opts_->GetOption(sockopt_ack_timeout_secs));
     if (allow_duration.IsZero())
         return ;
@@ -65,15 +62,13 @@ void QuicConnectionVisitor::SetNoAckAlarm()
 
 void QuicConnectionVisitor::CancelNoAckAlarm()
 {
-    canceled_ = true;
     noAckAlarm_->Cancel();
 }
 
-void QuicConnectionVisitor::Bind(std::recursive_mutex * mtx, QuicConnection * connection,
+void QuicConnectionVisitor::Bind(QuicConnection * connection,
         QuicSocketOptions * opts, FdBase * parent,
         std::shared_ptr<PosixQuicPacketTransport> packetTransport)
 {
-    mtx_ = mtx;
     connection_ = connection;
     opts_ = opts;
     parent_ = parent;

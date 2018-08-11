@@ -24,6 +24,7 @@ class Connection
 
 public:
     struct Context {
+        uint64_t id = 0;
         bool isSocket;
         union {
             QuicSocket socket;
@@ -53,6 +54,8 @@ public:
 public:
     // create by user
     explicit Connection(IOService* ios);
+
+    virtual ~Connection();
 
     int Connect(const struct sockaddr* addr, socklen_t addrLen);
 
@@ -92,11 +95,12 @@ private:
 
     void OnAcceptStream();
 
-    void OnCanRead(QuicStream stream);
+    // @return: is valid.
+    bool OnCanRead(QuicStream stream);
 
-    void OnCanWrite(QuicStream stream);
+    bool OnCanWrite(QuicStream stream);
 
-    void OnError(QuicStream stream);
+    bool OnError(QuicStream stream);
 
     int AddIntoService();
 

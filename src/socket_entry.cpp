@@ -14,27 +14,35 @@ namespace posix_quic {
 
 using namespace net;
 
-QuartcFactory& QuicSocketEntry::GetQuartcFactory()
+QuicSocketEntry::QuicSocketEntry(QuicSocketSession * session)
+    : impl_(session)
 {
-    static QuartcFactory factory(
-            QuartcFactoryConfig{&QuicTaskRunner::getInstance(), &QuicClockImpl::getInstance()},
-            []( std::unique_ptr<QuicConnection> connection,
-                const QuicConfig& config, const std::string& unique_remote_server_id,
-                Perspective perspective,
-                QuicConnectionHelperInterface* helper,
-                QuicClock* clock )
-            {
-                return static_cast<QuartcSessionInterface*>(new QuicSocketEntry(
-                        std::move(connection), config, unique_remote_server_id,
-                        perspective, helper, clock));
-            });
-    return factory;
+}
+
+QuicSocketEntry::~QuicSocketEntry()
+{
+    impl_.reset();
 }
 
 QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry(bool isServer, QuicConnectionId id)
 {
     if (id == INVALID_QUIC_CONNECTION_ID)
         id = QuicRandom::GetInstance()->RandUint64();
+
+    std::shared_ptr<QuicTaskRunnerProxy> taskRunnerProxy(new QuicTaskRunnerProxy);
+
+    std::shared_ptr<QuartcFactory> factory(new QuartcFactory(
+            QuartcFactoryConfig{taskRunnerProxy.get(), &QuicClockImpl::getInstance()},
+            []( std::unique_ptr<QuicConnection> connection,
+                const QuicConfig& config, const std::string& unique_remote_server_id,
+                Perspective perspective,
+                QuicConnectionHelperInterface* helper,
+                QuicClock* clock )
+            {
+                return static_cast<QuartcSessionInterface*>(new QuicSocketSession(
+                        std::move(connection), config, unique_remote_server_id,
+                        perspective, helper, clock));
+            }));
 
     int fd = GetFdFactory().Alloc();
     std::shared_ptr<PosixQuicPacketTransport> packetTransport(new PosixQuicPacketTransport);
@@ -46,15 +54,16 @@ QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry(bool isServer, QuicConnec
     config.connection_id = id;
     config.max_idle_time_before_crypto_handshake_secs = 10;
     config.max_time_before_crypto_handshake_secs = 10;
-    QuartcSessionInterface* ptr = GetQuartcFactory().CreateQuartcSession(config).release();
+    QuicSocketSession* session = (QuicSocketSession*)factory->CreateQuartcSession(config).release();
 
-    QuicSocketEntryPtr sptr((QuicSocketEntry*)ptr);
+    QuicSocketEntryPtr sptr(new QuicSocketEntry(session));
     sptr->SetFd(fd);
+    sptr->factory_ = factory;
     sptr->packetTransport_ = packetTransport;
-    sptr->SetDelegate(sptr.get());
-    sptr->connection()->SetAlarmLock(&sptr->mtx_);
-    sptr->connection()->set_debug_visitor(&sptr->connectionVisitor_);
-    sptr->connectionVisitor_.Bind(&sptr->mtx_, sptr->connection(), &sptr->opts_,
+    sptr->taskRunnerProxy_ = taskRunnerProxy;
+    session->SetDelegate(sptr.get());
+    session->connection()->set_debug_visitor(&sptr->connectionVisitor_);
+    sptr->connectionVisitor_.Bind(session->connection(), &sptr->opts_,
             sptr.get(), sptr->packetTransport_);
 
     GetFdManager().Put(fd, sptr);
@@ -110,7 +119,7 @@ int QuicSocketEntry::CreateNewUdpSocket()
                 delete p;
             });
     socketState_ = QuicSocketState_Inited;
-    GetConnectionManager().Put(*udpSocket_, connection_id(), Fd(), true);
+    GetConnectionManager().Put(*udpSocket_, impl_->connection_id(), Fd(), true);
     return 0;
 }
 
@@ -144,9 +153,9 @@ void QuicSocketEntry::SetOpt(int type, long value)
         case sockopt_idle_timeout_secs:
             {
                 std::unique_lock<std::recursive_mutex> lock(mtx_);
-                config()->SetIdleNetworkTimeout(QuicTime::Delta::FromSeconds(value),
+                impl_->config()->SetIdleNetworkTimeout(QuicTime::Delta::FromSeconds(value),
                         QuicTime::Delta::FromSeconds(value));
-                connection()->SetFromConfig(*config());
+                impl_->connection()->SetFromConfig(*impl_->config());
             }
             break;
     }
@@ -209,12 +218,12 @@ int QuicSocketEntry::Connect(const struct sockaddr* addr, socklen_t addrlen)
 
     packetTransport_->Set(udpSocket_, address);
 
-    DebugPrint(dbg_connect, "-> fd = %d, StartCryptoHandshake connectionId = %lu", Fd(), connection_id());
-    this->OnTransportCanWrite();
-    this->Initialize();
+    DebugPrint(dbg_connect, "-> fd = %d, StartCryptoHandshake connectionId = %lu", Fd(), impl_->connection_id());
+    impl_->OnTransportCanWrite();
+    impl_->Initialize();
     if (GetOpt(sockopt_ack_timeout_secs) == 0 && kDefaultAckTimeout)
         this->SetOpt(sockopt_ack_timeout_secs, kDefaultAckTimeout);
-    this->StartCryptoHandshake();
+    impl_->StartCryptoHandshake();
 
     errno = EINPROGRESS;
     return -1;
@@ -231,8 +240,8 @@ int QuicSocketEntry::Close()
     socketState_ = QuicSocketState_Closed;
     connectionVisitor_.CancelNoAckAlarm();
     if (udpSocket_)
-        GetConnectionManager().Delete(*udpSocket_, connection_id(), Fd());
-    CloseConnection("");
+        GetConnectionManager().Delete(*udpSocket_, impl_->connection_id(), Fd());
+    impl_->CloseConnection("");
     ClearWaitingsByClose();
     ClearAcceptSocketByClose();
     return 0;
@@ -280,14 +289,14 @@ QuicStreamEntryPtr QuicSocketEntry::CreateStream()
     }
 
     std::unique_lock<std::recursive_mutex> lock(mtx_);
-    QuartcStream* stream = CreateOutgoingDynamicStream();
+    QuartcStream* stream = impl_->CreateOutgoingDynamicStream();
     return QuicStreamEntry::NewQuicStream(shared_from_this(), stream);
 }
 
 QuartcStreamPtr QuicSocketEntry::GetQuartcStream(QuicStreamId streamId)
 {
     std::unique_lock<std::recursive_mutex> lock(mtx_);
-    QuartcStream* ptr = (QuartcStream*)GetOrCreateStream(streamId);
+    QuartcStream* ptr = (QuartcStream*)impl_->GetOrCreateStream(streamId);
     if (!ptr) return QuartcStreamPtr();
     auto self = this->shared_from_this();
     lock.release();
@@ -300,7 +309,7 @@ QuartcStreamPtr QuicSocketEntry::GetQuartcStream(QuicStreamId streamId)
 void QuicSocketEntry::CloseStream(uint64_t streamId)
 {
     std::unique_lock<std::recursive_mutex> lock(mtx_);
-    QuartcSession::CloseStream(streamId);
+    impl_->CloseStream(streamId);
 }
 
 void QuicSocketEntry::ProcessUdpPacket(const QuicSocketAddress& self_address,
@@ -310,7 +319,8 @@ void QuicSocketEntry::ProcessUdpPacket(const QuicSocketAddress& self_address,
     DebugPrint(dbg_connect | dbg_accept | dbg_write | dbg_read,
             "fd = %d, packet length = %d", Fd(), (int)packet.length());
     std::unique_lock<std::recursive_mutex> lock(mtx_);
-    QuartcSession::ProcessUdpPacket(self_address, peer_address, packet);
+    impl_->FlushWrites();
+    impl_->ProcessUdpPacket(self_address, peer_address, packet);
 }
 
 bool QuicSocketEntry::IsConnected()
@@ -335,25 +345,25 @@ void QuicSocketEntry::OnSyn(QuicSocketEntryPtr owner, QuicSocketAddress address)
     socketState_ = QuicSocketState_Shared;
     udpSocket_ = owner->udpSocket_;
     packetTransport_->Set(udpSocket_, address);
-    GetConnectionManager().Put(*udpSocket_, connection_id(), Fd(), false);
+    GetConnectionManager().Put(*udpSocket_, impl_->connection_id(), Fd(), false);
     DebugPrint(dbg_accept, "-> fd = %d, connectionId = %lu, OnSyn(owner=%d, address=%s)",
-            Fd(), connection_id(), owner->Fd(), address.ToString().c_str());
-    this->OnTransportCanWrite();
-    this->Initialize();
+            Fd(), impl_->connection_id(), owner->Fd(), address.ToString().c_str());
+    impl_->OnTransportCanWrite();
+    impl_->Initialize();
     if (GetOpt(sockopt_ack_timeout_secs) == 0 && kDefaultAckTimeout)
         this->SetOpt(sockopt_ack_timeout_secs, kDefaultAckTimeout);
     if (GetOpt(sockopt_idle_timeout_secs) == 0 && kDefaultIdleTimeout)
         this->SetOpt(sockopt_idle_timeout_secs, kDefaultIdleTimeout);
-    this->StartCryptoHandshake();
+    impl_->StartCryptoHandshake();
 }
 
 void QuicSocketEntry::OnCryptoHandshakeComplete()
 {
     socketState_ = QuicSocketState_Connected;
     DebugPrint(dbg_connect | dbg_accept, "-> fd = %d, OnCryptoHandshakeComplete %s", 
-            Fd(), Perspective2Str((int)perspective()));
+            Fd(), Perspective2Str((int)impl_->perspective()));
     SetWritable(true);
-    if (perspective() == Perspective::IS_SERVER) {
+    if (impl_->perspective() == Perspective::IS_SERVER) {
         // push to owner accept queue.
         assert(udpSocket_);
         QuicSocket ownerSocket = GetConnectionManager().GetOwner(*udpSocket_);
@@ -377,7 +387,7 @@ void QuicSocketEntry::OnConnectionClosed(int error_code, bool from_remote)
     SetCloseByPeer(from_remote);
     SetError(ESHUTDOWN, error_code);
 
-    if (socketState_ != QuicSocketState_Connected && perspective() == Perspective::IS_SERVER) {
+    if (socketState_ != QuicSocketState_Connected && impl_->perspective() == Perspective::IS_SERVER) {
         // 接受链接失败, fd还没吐给用户层
         this->Close();
         DeleteQuicSocketEntry(shared_from_this());
@@ -416,8 +426,8 @@ std::string QuicSocketEntry::GetDebugInfo(int indent)
         }
     }
 
-    size_t numInStreams = GetNumOpenIncomingStreams();
-    size_t numOutStreams = GetNumOpenOutgoingStreams();
+    size_t numInStreams = impl_->GetNumOpenIncomingStreams();
+    size_t numOutStreams = impl_->GetNumOpenOutgoingStreams();
 
     if (numInStreams > 0)
         info += idt2 + P("Number incoming stream: %d", (int)numInStreams);

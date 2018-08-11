@@ -12,31 +12,31 @@
 #include <assert.h>
 #include <atomic>
 #include <thread>
-#include "../../profiler.h"
+#include <unordered_map>
+//#include "../../profiler.h"
 
 using namespace posix_quic;
 using namespace posix_quic::simple;
 
 std::atomic_long g_tps{0}, g_bytes{0};
 
-void show() {
-    long last_tps = 0;
-    long last_bytes = 0;
-    for (;;) {
-        sleep(1);
-
-        long tps = g_tps - last_tps;
-        long bytes = g_bytes - last_bytes;
-        last_tps = g_tps;
-        last_bytes = g_bytes;
-
-        UserLog("TPS: %ld, Bytes: %ld KB", tps, bytes / 1024);
-    }
-}
+std::unordered_map<class ServerConnection*, int> g_delMap;
 
 class ServerConnection : public Connection
 {
-    using Connection::Connection;
+public:
+    static std::atomic_long nConnections;
+
+    ServerConnection(IOService* ios) : Connection(ios) {
+    }
+
+    ServerConnection(IOService* ios, QuicSocket socket) : Connection(ios, socket) {
+        ++nConnections;
+    }
+
+    ~ServerConnection() {
+        --nConnections;
+    }
 
 public:
     virtual Connection* NewConnection(IOService* ios, QuicSocket socket) {
@@ -61,21 +61,44 @@ public:
     }
 
     virtual void OnClose(int sysError, int quicError, bool bFromRemote) {
-        UserLog("Close Socket fd=%d closeByPeer:%d\n", Native(), bFromRemote);
+        UserLog("Close Socket fd=%d sysErr=%d, quicErr=%d, closeByPeer:%d\n",
+                Native(), sysError, quicError, bFromRemote);
+        if (g_delMap.count(this)) {
+            UserLog("double free!");
+        } else {
+            g_delMap[this] = 1;
+        }
         delete this;
     }
 
     virtual void OnStreamClose(int sysError, int quicError, QuicStream stream) {
-        UserLog("Close Stream fd=%d\n", stream);
+//        UserLog("Close Stream fd=%d\n", stream);
     }
 };
+std::atomic_long ServerConnection::nConnections{0};
+
+void show() {
+    long last_tps = 0;
+    long last_bytes = 0;
+    for (;;) {
+        sleep(1);
+
+        long tps = g_tps - last_tps;
+        long bytes = g_bytes - last_bytes;
+        last_tps = g_tps;
+        last_bytes = g_bytes;
+
+        UserLog("TPS: %ld, Bytes: %ld KB, Conn: %ld",
+                tps, bytes / 1024, (long)ServerConnection::nConnections);
+    }
+}
 
 int main() {
 //    debug_mask = dbg_all & ~dbg_timer;
 //    debug_mask = dbg_close;
 //    debug_mask = dbg_simple;
 
-    GProfiler::Initialize();
+//    GProfiler::Initialize();
 
     std::thread(&show).detach();
     
