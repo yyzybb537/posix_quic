@@ -43,6 +43,8 @@ QuicTaskRunner::QuicTaskRunner()
 
 void QuicTaskRunner::ThreadRun()
 {
+    ScheduledTask::IsInTaskRunnerThread() = true;
+
     for (;;) {
         usleep(10 * 1000);
 
@@ -69,7 +71,13 @@ void QuicTaskRunner::ThreadRun()
 
         for (auto & storage : triggers) {
             DebugPrint(dbg_timer, "start trigger schedule(id=%ld) task-count=%d", storage->id, (int)tasks_.size());
-            storage->task->Run();
+
+            {
+                std::unique_lock<SpinLock> lock(storage->callLock, std::defer_lock);
+                if (lock.try_lock())
+                    storage->task->Run();
+            }
+
             DebugPrint(dbg_timer, "end trigger schedule(id=%ld) task-count=%d", storage->id, (int)tasks_.size());
         }
     }

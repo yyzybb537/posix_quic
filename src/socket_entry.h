@@ -113,7 +113,7 @@ private:
     void ClearAcceptSocketByClose();
 
 private:
-    std::mutex mtx_;
+    std::recursive_mutex mtx_;
 
     std::shared_ptr<int> udpSocket_;
     QuicSocketState socketState_ = QuicSocketState_None;

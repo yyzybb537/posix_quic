@@ -9,7 +9,7 @@ public:
         : visitor_(visitor) {}
 
     void OnAlarm() override {
-        std::unique_lock<std::mutex> lock(visitor_->GetAlarmLock());
+        std::unique_lock<std::recursive_mutex> lock(visitor_->GetAlarmLock());
         visitor_->CheckForNoAckTimeout();
     }
 
@@ -69,7 +69,7 @@ void QuicConnectionVisitor::CancelNoAckAlarm()
     noAckAlarm_->Cancel();
 }
 
-void QuicConnectionVisitor::Bind(std::mutex * mtx, QuicConnection * connection,
+void QuicConnectionVisitor::Bind(std::recursive_mutex * mtx, QuicConnection * connection,
         QuicSocketOptions * opts, FdBase * parent,
         std::shared_ptr<PosixQuicPacketTransport> packetTransport)
 {

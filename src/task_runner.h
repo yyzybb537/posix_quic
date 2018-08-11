@@ -1,6 +1,7 @@
 #pragma once
 
 #include "fwd.h"
+#include "spinlock.h"
 #include <mutex>
 #include <map>
 #include <atomic>
@@ -22,10 +23,11 @@ public:
     typedef std::multimap<int64_t, TaskStoragePtr> TaskMap;
 
     struct TaskStorage {
+        long id;
         Task * task;
         TaskMap::iterator itr;
         std::atomic_flag invalid{false};
-        long id;
+        SpinLock callLock;
 
         inline static long& StaticTaskId() {
             static long taskId = 0;
@@ -43,7 +45,17 @@ public:
             if (!storage_->invalid.test_and_set(std::memory_order_acquire)) {
                 DebugPrint(dbg_timer, "cancel schedule(id=%ld)", storage_->id);
                 QuicTaskRunner::getInstance().Cancel(storage_->itr);
+            } else if (!IsInTaskRunnerThread()) {
+                storage_->callLock.lock();
             }
+        }
+        
+    private:
+        friend class QuicTaskRunner;
+
+        static bool & IsInTaskRunnerThread() {
+            static thread_local bool b = false;
+            return b;
         }
 
     private:

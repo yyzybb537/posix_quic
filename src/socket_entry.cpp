@@ -136,14 +136,14 @@ void QuicSocketEntry::SetOpt(int type, long value)
     switch (type) {
         case sockopt_ack_timeout_secs:
             {
-                std::unique_lock<std::mutex> lock(mtx_);
+                std::unique_lock<std::recursive_mutex> lock(mtx_);
                 connectionVisitor_.SetNoAckAlarm();
             }
             break;
 
         case sockopt_idle_timeout_secs:
             {
-                std::unique_lock<std::mutex> lock(mtx_);
+                std::unique_lock<std::recursive_mutex> lock(mtx_);
                 config()->SetIdleNetworkTimeout(QuicTime::Delta::FromSeconds(value),
                         QuicTime::Delta::FromSeconds(value));
                 connection()->SetFromConfig(*config());
@@ -224,7 +224,7 @@ int QuicSocketEntry::Close()
     if (socketState_ == QuicSocketState_Closed)
         return 0;
 
-    std::unique_lock<std::mutex> lock(mtx_);
+    std::unique_lock<std::recursive_mutex> lock(mtx_);
     if (socketState_ == QuicSocketState_Closed)
         return 0;
 
@@ -279,14 +279,14 @@ QuicStreamEntryPtr QuicSocketEntry::CreateStream()
         return QuicStreamEntryPtr();
     }
 
-    std::unique_lock<std::mutex> lock(mtx_);
+    std::unique_lock<std::recursive_mutex> lock(mtx_);
     QuartcStream* stream = CreateOutgoingDynamicStream();
     return QuicStreamEntry::NewQuicStream(shared_from_this(), stream);
 }
 
 QuartcStreamPtr QuicSocketEntry::GetQuartcStream(QuicStreamId streamId)
 {
-    std::unique_lock<std::mutex> lock(mtx_);
+    std::unique_lock<std::recursive_mutex> lock(mtx_);
     QuartcStream* ptr = (QuartcStream*)GetOrCreateStream(streamId);
     if (!ptr) return QuartcStreamPtr();
     auto self = this->shared_from_this();
@@ -299,7 +299,7 @@ QuartcStreamPtr QuicSocketEntry::GetQuartcStream(QuicStreamId streamId)
 
 void QuicSocketEntry::CloseStream(uint64_t streamId)
 {
-    std::unique_lock<std::mutex> lock(mtx_);
+    std::unique_lock<std::recursive_mutex> lock(mtx_);
     QuartcSession::CloseStream(streamId);
 }
 
@@ -309,7 +309,7 @@ void QuicSocketEntry::ProcessUdpPacket(const QuicSocketAddress& self_address,
 {
     DebugPrint(dbg_connect | dbg_accept | dbg_write | dbg_read,
             "fd = %d, packet length = %d", Fd(), (int)packet.length());
-    std::unique_lock<std::mutex> lock(mtx_);
+    std::unique_lock<std::recursive_mutex> lock(mtx_);
     QuartcSession::ProcessUdpPacket(self_address, peer_address, packet);
 }
 
@@ -390,7 +390,7 @@ std::string QuicSocketEntry::GetDebugInfo(int indent)
     std::string idt2 = idt + ' ';
     std::string idt3 = idt2 + ' ';
 
-    std::unique_lock<std::mutex> lock(mtx_);
+    std::unique_lock<std::recursive_mutex> lock(mtx_);
     std::string info;
     info += idt + P("=========== Socket: %d ===========", Fd());
 
