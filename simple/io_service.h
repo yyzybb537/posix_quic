@@ -15,7 +15,7 @@ public:
 
     QuicEpoller Native() const { return ep_; }
 
-    void Run(int timeout = 0);
+    size_t Run(int timeout = 0);
 
     void RunLoop();
 

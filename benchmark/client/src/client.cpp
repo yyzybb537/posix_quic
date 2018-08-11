@@ -21,7 +21,7 @@ using namespace posix_quic::simple;
 std::atomic_long g_tps{0}, g_bytes{0};
 const int g_bytesPerReq = 128;
 const int g_connection = 100;
-const int g_pipeline = 1;
+const int g_pipeline = 100;
 
 long g_bufferdSlices = 0;
 
@@ -109,6 +109,7 @@ public:
 int main() {
 //    debug_mask = dbg_all & ~dbg_timer;
 //    debug_mask = dbg_simple;
+    debug_mask = dbg_close;
 
     std::thread(&show).detach();
 

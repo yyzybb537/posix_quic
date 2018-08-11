@@ -10,7 +10,7 @@ IOService::IOService()
     ep_ = QuicCreateEpoll();
 }
 
-void IOService::Run(int timeout)
+size_t IOService::Run(int timeout)
 {
     struct epoll_event evs[1024];
     int n = QuicEpollWait(ep_, evs, 1024, timeout);
@@ -41,12 +41,14 @@ void IOService::Run(int timeout)
                 continue;
         }
     }
+
+    return n;
 }
 
 void IOService::RunLoop()
 {
     for (;;) {
-        Run(6000);
+        Run(10);
     }
 }
 

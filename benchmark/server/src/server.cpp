@@ -95,7 +95,7 @@ void show() {
 
 int main() {
 //    debug_mask = dbg_all & ~dbg_timer;
-//    debug_mask = dbg_close;
+    debug_mask = dbg_close | dbg_ack_timeout | dbg_conn_visitor;
 //    debug_mask = dbg_simple;
 
 //    GProfiler::Initialize();
@@ -116,5 +116,9 @@ int main() {
         exit(1);
     }
 
-    ios.RunLoop();
+//    ios.RunLoop();
+    for (;;) {
+        size_t n = ios.Run(6000);
+        UserLog("EpollWait %d", (int)n);
+    }
 }

@@ -251,7 +251,7 @@ retry_wait:
         }
 
         if (res > 0) break;
-        if (res == 0 && onceTimeout == 0) break;
+        if (res == 0 && (onceTimeout == 0 || timeRemain == onceTimeout)) break;
     }
 
     for (int i = 0; i < res; ++i) {
