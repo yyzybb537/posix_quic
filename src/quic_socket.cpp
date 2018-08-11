@@ -28,17 +28,22 @@ int QuicCloseSocket(QuicSocket sock)
     return 0;
 }
 
-int GetQuicError(QuicSocket sock)
+int GetQuicError(QuicSocketOrStream fd, int * sysError, int * quicError, int * bFromRemote)
 {
-    EntryPtr entry = EntryBase::GetFdManager().Get(sock);
-    if (!entry || entry->Category() != EntryCategory::Socket) {
-        DebugPrint(dbg_api, "sock = %d, return = -1, errno = EBADF", sock);
+    EntryPtr entry = EntryBase::GetFdManager().Get(fd);
+    if (!entry) {
+        DebugPrint(dbg_api, "fd = %d, return = -1, errno = EBADF", fd);
         errno = EBADF;
         return -1;
     }
 
-    errno = entry->Error();
-    return (int)entry->GetQuicErrorCode();
+    if (sysError)
+        *sysError = entry->Error();
+    if (quicError)
+        *quicError = (int)entry->GetQuicErrorCode();
+    if (bFromRemote)
+        *bFromRemote = entry->IsCloseByPeer() ? 1 : 0;
+    return 0;
 }
 
 const char* QuicErrorToString(int quicErrorCode)

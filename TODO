@@ -1,5 +1,7 @@
 TODO:
-*.性能压测
+*.定制每个stream的发送缓冲区大小
+*.测试发送缓冲区发满, EPOLLOUT续发的情况
+*.多核性能压测
 *.epoll从O(n)遍历优化成O(1)
 *.大并发压测
 *.资源回收
@@ -16,6 +18,7 @@ Done:
 *.客户端漫游
 *.减轻quic_socket.h的include负担
 *.SetQuicSocketOpt/GetQuicSocketOpt
+*.性能压测
 
 Dis:
 *.socket的正常关闭

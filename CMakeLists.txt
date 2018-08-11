@@ -40,7 +40,4 @@ include_directories(${PROJECT_SOURCE_DIR}/libquic/third_party/protobuf/src)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/libquic)
 
-link_directories(${PROJECT_BIN_DIR}/libquic)
-
-# target
-target_link_libraries(${TARGET} quic -pthread -ldl)
+add_subdirectory(${PROJECT_SOURCE_DIR}/simple simple)

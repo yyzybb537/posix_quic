@@ -23,6 +23,7 @@
 
 namespace posix_quic {
 
+typedef int QuicSocketOrStream;
 
 // 真正的epoll fd, 可用poll、epoll监听
 typedef int QuicEpoller;
@@ -31,7 +32,7 @@ QuicSocket QuicCreateSocket();
 
 int QuicCloseSocket(QuicSocket sock);
 
-int GetQuicError(QuicSocket sock);
+int GetQuicError(QuicSocketOrStream fd, int * sysError, int * quicError, int * bFromRemote);
 
 const char* QuicErrorToString(int quicErrorCode);
 
