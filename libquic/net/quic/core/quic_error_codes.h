@@ -282,8 +282,10 @@ enum QuicErrorCode {
   // Receive a RST_STREAM with offset larger than kMaxStreamLength.
   QUIC_STREAM_LENGTH_OVERFLOW = 98,
 
+  QUIC_NETWORK_ACK_TIMEOUT = 101,
+
   // No error. Used as bound while iterating.
-  QUIC_LAST_ERROR = 101,
+  QUIC_LAST_ERROR = 102,
 };
 // QuicErrorCodes is encoded as a single octet on-the-wire.
 static_assert(static_cast<int>(QUIC_LAST_ERROR) <=

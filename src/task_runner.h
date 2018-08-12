@@ -27,6 +27,7 @@ public:
         std::atomic_flag invalid{false};
         SpinLock callLock;
         QuicTaskRunner * runner_;
+        uint64_t connectionId = -1;
 
         inline static long& StaticTaskId() {
             static long taskId = 0;
@@ -64,14 +65,14 @@ public:
     std::unique_ptr<QuartcTaskRunnerInterface::ScheduledTask>
         Schedule(Task* task, uint64_t delay_ms) override;
 
+    std::unique_ptr<QuartcTaskRunnerInterface::ScheduledTask>
+        Schedule(Task* task, uint64_t delay_ms, uint64_t connectionId);
+
     void Cancel(TaskMap::iterator itr);
 
     void RunOnce();
 
     QuicTaskRunner();
-
-private:
-    void ThreadRun();
 
 private:
     std::mutex mtx_;
@@ -127,10 +128,14 @@ public:
 
     void Cancel(StoragePtr storage);
 
+    void SetConnectionId(uint64_t connectionId) { connectionId_ = connectionId; }
+
 private:
     std::unordered_map<Storage*, StoragePtr> storages_;
 
     QuicTaskRunner *runner_ = nullptr;
+
+    uint64_t connectionId_ = -1;
 };
 
 } // namespace posix_quic

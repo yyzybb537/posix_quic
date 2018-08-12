@@ -24,6 +24,7 @@ Connection::Connection(IOService* ios)
     : ios_(ios)
 {
     socket_ = QuicCreateSocket();
+    connectionId_ = GetQuicConnectionId(socket_);
 
     sockCtx_.isSocket = true;
     sockCtx_.socket = socket_;
@@ -35,6 +36,7 @@ Connection::Connection(IOService* ios, QuicSocket socket)
     : ios_(ios)
 {
     socket_ = socket;
+    connectionId_ = GetQuicConnectionId(socket_);
     connected_ = true;
 
     sockCtx_.isSocket = true;

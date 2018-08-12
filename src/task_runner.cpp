@@ -7,10 +7,17 @@ namespace posix_quic {
 std::unique_ptr<QuartcTaskRunnerInterface::ScheduledTask>
 QuicTaskRunner::Schedule(Task* task, uint64_t delay_ms)
 {
+    return Schedule(task, delay_ms, -1);
+}
+
+std::unique_ptr<QuartcTaskRunnerInterface::ScheduledTask>
+QuicTaskRunner::Schedule(Task* task, uint64_t delay_ms, uint64_t connectionId)
+{
     int64_t d = QuicClockImpl::getInstance().NowMicroseconds() / 1000 + delay_ms;
     TaskStoragePtr storage(new TaskStorage);
     storage->task = task;
     storage->runner_ = this;
+    storage->connectionId = connectionId;
 
     std::unique_lock<std::mutex> lock(mtx_);
     auto itr = tasks_.insert(TaskMap::value_type(d, storage));
@@ -32,8 +39,6 @@ void QuicTaskRunner::Cancel(TaskMap::iterator itr)
 
 QuicTaskRunner::QuicTaskRunner()
 {
-    std::thread t([this]{ this->ThreadRun(); });
-    t.detach();
 }
 
 void QuicTaskRunner::RunOnce()
@@ -65,23 +70,16 @@ void QuicTaskRunner::RunOnce()
 
         {
             std::unique_lock<SpinLock> lock(storage->callLock, std::defer_lock);
-            if (lock.try_lock())
+            if (lock.try_lock()) {
+                TlsConnectionIdGuard guard(storage->connectionId);
                 storage->task->Run();
+            }
         }
 
         DebugPrint(dbg_timer, "end trigger schedule(id=%ld) task-count=%d", storage->id, (int)tasks_.size());
     }
 
     ScheduledTask::IsInTaskRunnerThread() = false;
-}
-
-void QuicTaskRunner::ThreadRun()
-{
-    for (;;) {
-        usleep(10 * 1000);
-
-        RunOnce();
-    }
 }
 
 std::unique_ptr<QuartcTaskRunnerInterface::ScheduledTask>
@@ -91,7 +89,7 @@ QuicTaskRunnerProxy::Schedule(Task* task, uint64_t delay_ms)
     StoragePtr storage(new Storage(task, deadline, this));
     storages_[storage.get()] = storage;
     if (runner_) {
-        storage->link_ = runner_->Schedule(storage->task_, delay_ms);
+        storage->link_ = runner_->Schedule(storage->task_, delay_ms, connectionId_);
     }
     return std::unique_ptr<QuartcTaskRunnerInterface::ScheduledTask>(
             static_cast<QuartcTaskRunnerInterface::ScheduledTask*>(
@@ -106,7 +104,7 @@ bool QuicTaskRunnerProxy::Link(QuicTaskRunner *runner)
         StoragePtr & storage = kv.second;
         int64_t now = QuicClockImpl::getInstance().NowMicroseconds() / 1000;
         uint64_t delay_ms = now > storage->deadline_ ? 0 : (storage->deadline_ - now);
-        storage->link_ = runner_->Schedule(storage->task_, delay_ms);
+        storage->link_ = runner_->Schedule(storage->task_, delay_ms, connectionId_);
     }
     return true;
 }

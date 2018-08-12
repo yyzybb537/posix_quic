@@ -85,5 +85,8 @@ int QuicEpollCtl(QuicEpoller epfd, int op, int quicFd, struct epoll_event *event
 
 int QuicEpollWait(QuicEpoller epfd, struct epoll_event *events, int maxevents, int timeout);
 
+// ---- for debug -----
+uint64_t GetQuicConnectionId(QuicSocket sock);
+
 } // namespace posix_quic
 

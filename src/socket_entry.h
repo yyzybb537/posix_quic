@@ -98,6 +98,8 @@ public:
 
     std::string GetDebugInfo(int indent);
 
+    QuicConnectionId connection_id();
+
     // -----------------------------------------------------------------
     // QuartcSessionInterface::Delegate
 private:

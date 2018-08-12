@@ -69,6 +69,8 @@ public:
 
     long BufferedSliceCount(QuicStream stream);
 
+    uint64_t ConnectionId() const { return connectionId_; }
+
 public:
     virtual Connection* NewConnection(IOService* ios, QuicSocket socket) = 0;
 
@@ -124,6 +126,8 @@ private:
     bool connected_ = false;
 
     bool closed_ = false;
+
+    uint64_t connectionId_ = -1;
 };
 
 } // amespace simple

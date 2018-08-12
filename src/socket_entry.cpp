@@ -30,6 +30,7 @@ QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry(bool isServer, QuicConnec
         id = QuicRandom::GetInstance()->RandUint64();
 
     std::shared_ptr<QuicTaskRunnerProxy> taskRunnerProxy(new QuicTaskRunnerProxy);
+    taskRunnerProxy->SetConnectionId(id);
 
     std::shared_ptr<QuartcFactory> factory(new QuartcFactory(
             QuartcFactoryConfig{taskRunnerProxy.get(), &QuicClockImpl::getInstance()},
@@ -316,6 +317,8 @@ void QuicSocketEntry::ProcessUdpPacket(const QuicSocketAddress& self_address,
         const QuicSocketAddress& peer_address,
         const QuicReceivedPacket& packet)
 {
+    TlsConnectionIdGuard guard(impl_->connection_id());
+
     DebugPrint(dbg_connect | dbg_accept | dbg_write | dbg_read,
             "fd = %d, packet length = %d", Fd(), (int)packet.length());
     std::unique_lock<std::recursive_mutex> lock(mtx_);
@@ -437,6 +440,11 @@ std::string QuicSocketEntry::GetDebugInfo(int indent)
 
     info += Event::GetDebugInfo(indent + 1);
     return info;
+}
+
+QuicConnectionId QuicSocketEntry::connection_id()
+{
+    return impl_ ? impl_->connection_id() : -1;
 }
 
 } // namespace posix_quic

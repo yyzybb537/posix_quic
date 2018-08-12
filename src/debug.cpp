@@ -23,9 +23,11 @@ std::string GetCurrentTime()
     gettimeofday(&tv, NULL);
     localtime_r(&tv.tv_sec, &local);
     char buffer[128];
-    snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d %02d:%02d:%02d.%06lu",
-            local.tm_year+1900, local.tm_mon+1, local.tm_mday, 
+    snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d.%06lu",
             local.tm_hour, local.tm_min, local.tm_sec, tv.tv_usec);
+//    snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d %02d:%02d:%02d.%06lu",
+//            local.tm_year+1900, local.tm_mon+1, local.tm_mday, 
+//            local.tm_hour, local.tm_min, local.tm_sec, tv.tv_usec);
     return std::string(buffer);
 #else
     return std::string();
@@ -50,6 +52,22 @@ const char* BaseFile(const char* file)
     if (p) return p + 1;
 
     return file;
+}
+
+uint64_t & TlsConnectionId()
+{
+    static thread_local uint64_t connId = 0;
+    return connId;
+}
+
+TlsConnectionIdGuard::TlsConnectionIdGuard(uint64_t id)
+{
+    backup_ = TlsConnectionId();
+    TlsConnectionId() = id;
+}
+TlsConnectionIdGuard::~TlsConnectionIdGuard()
+{
+    TlsConnectionId() = backup_;
 }
 
 std::string Bin2Hex(const char* data, size_t length, const std::string& split)

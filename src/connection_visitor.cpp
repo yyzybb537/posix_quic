@@ -42,7 +42,7 @@ void QuicConnectionVisitor::CheckForNoAckTimeout()
                     (long)(now - QuicTime::Zero()).ToMilliseconds(),
                     (long)(lastAckTime_ - QuicTime::Zero()).ToMilliseconds(),
                     (long)(lastSendTime_ - QuicTime::Zero()).ToMilliseconds());
-            connection_->CloseConnection(net::QUIC_NETWORK_IDLE_TIMEOUT, "ack timeout",
+            connection_->CloseConnection(net::QUIC_NETWORK_ACK_TIMEOUT, "ack timeout",
                       net::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET_WITH_NO_ACK);
             return ;
         }
@@ -87,8 +87,16 @@ void QuicConnectionVisitor::OnPacketSent(const SerializedPacket& serialized_pack
         TransmissionType transmission_type,
         QuicTime sent_time)
 {
-    DebugPrint(dbg_conn_visitor | dbg_ack_timeout, "Visitor sent fd = %d, original_packet_number=%lu transmission_type=%d",
-            parent_->Fd(), original_packet_number, (int)transmission_type);
+    char frameTypes[(int)net::QuicFrameType::NUM_FRAME_TYPES + 1] = {};
+    memset(frameTypes, '-', sizeof(frameTypes) - 1);
+    for (auto const& frame : serialized_packet.retransmittable_frames) {
+        int type = (int)frame.type;
+        frameTypes[type] = '0' + type;
+    }
+
+    DebugPrint(dbg_conn_visitor | dbg_ack_timeout, "Visitor sent fd = %d, len=%d, has_ack=%d, transmission_type=%d, frames=%s",
+            parent_->Fd(), (int)serialized_packet.encrypted_length,
+            serialized_packet.has_ack, (int)transmission_type, frameTypes);
 
     if (TransmissionType::NOT_RETRANSMISSION == transmission_type) {
         if (lastSendTime_ <= lastAckTime_)

@@ -49,6 +49,18 @@ private:
     bool restored_;
 };
 
+uint64_t & TlsConnectionId();
+
+class TlsConnectionIdGuard
+{
+public:
+    explicit TlsConnectionIdGuard(uint64_t id);
+    ~TlsConnectionIdGuard();
+
+private:
+    uint64_t backup_;
+};
+
 std::string Bin2Hex(const char* data, size_t length, const std::string& split = "");
 const char* PollEvent2Str(short int event);
 const char* EpollEvent2Str(uint32_t event);
@@ -73,10 +85,11 @@ std::string GlobalDebugInfo(uint32_t sourceMask);
     do { \
         if ((type) == ::posix_quic::dbg_user || (::posix_quic::debug_mask & (type)) != 0) { \
             ErrnoStore es; \
-            fprintf(::posix_quic::debug_output, "[%s][P%05d]%s:%d:(%s)\t " fmt "\n", \
+            fprintf(::posix_quic::debug_output, "[%s]%s:%d:(%s) [C=%lu]\t " fmt "\n", \
                     ::posix_quic::GetCurrentTime().c_str(),\
-                    ::posix_quic::GetCurrentProcessID(),\
-                    ::posix_quic::BaseFile(__FILE__), __LINE__, __FUNCTION__, ##__VA_ARGS__); \
+                    ::posix_quic::BaseFile(__FILE__), __LINE__, __FUNCTION__, \
+                    TlsConnectionId(), \
+                    ##__VA_ARGS__); \
             fflush(::posix_quic::debug_output); \
         } \
     } while(0)

@@ -423,4 +423,17 @@ int QuicEpollWait(QuicEpoller epfd, struct epoll_event *events, int maxevents, i
     return res;
 }
 
+uint64_t GetQuicConnectionId(QuicSocket sock)
+{
+    auto socket = EntryBase::GetFdManager().Get(sock);
+    if (!socket || socket->Category() != EntryCategory::Socket) {
+        DebugPrint(dbg_api, "sock = %d, return = -1", sock);
+        return -1;
+    }
+
+    uint64_t id = ((QuicSocketEntry*)socket.get())->connection_id();
+    DebugPrint(dbg_api, "sock = %d, return connection_id = %lu", sock, id);
+    return id;
+}
+
 } // namespace posix_quic

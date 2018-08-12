@@ -26,6 +26,8 @@ size_t IOService::Run(int timeout)
         Connection::Context back = *evCtx;
         Connection::Context* ctx = &back;
 
+        TlsConnectionIdGuard guard(ctx->connection->ConnectionId());
+
         if (ev.events & EPOLLIN) {
             if (!ctx->connection->OnCanRead(ctx->isSocket ? -1 : ctx->stream))
                 continue;

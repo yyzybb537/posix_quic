@@ -61,7 +61,7 @@ public:
     }
 
     virtual void OnClose(int sysError, int quicError, bool bFromRemote) {
-        UserLog("Close Socket fd=%d sysErr=%d, quicErr=%d, closeByPeer:%d\n",
+        UserLog("Close Socket fd = %d sysErr=%d, quicErr=%d, closeByPeer:%d\n",
                 Native(), sysError, quicError, bFromRemote);
         if (g_delMap.count(this)) {
             UserLog("double free!");
@@ -94,9 +94,10 @@ void show() {
 }
 
 int main() {
-//    debug_mask = dbg_all & ~dbg_timer;
-    debug_mask = dbg_close | dbg_ack_timeout | dbg_conn_visitor;
+    debug_mask = dbg_all & ~dbg_timer;
+//    debug_mask = dbg_close | dbg_ack_timeout | dbg_conn_visitor;
 //    debug_mask = dbg_simple;
+//    debug_mask = dbg_close;
 
 //    GProfiler::Initialize();
 
@@ -116,9 +117,9 @@ int main() {
         exit(1);
     }
 
-//    ios.RunLoop();
-    for (;;) {
-        size_t n = ios.Run(6000);
-        UserLog("EpollWait %d", (int)n);
-    }
+    ios.RunLoop();
+//    for (;;) {
+//        size_t n = ios.Run(6000);
+//        UserLog("EpollWait %d", (int)n);
+//    }
 }
