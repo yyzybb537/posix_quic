@@ -58,6 +58,8 @@ public:
 
     // only called by client peer.
     virtual void OnConnected() {
+//        SetQuicSocketOpt(Native(), sockopt_stream_wmem, 1024);
+
         buf_.resize(g_bytesPerReq);
 
         for (int i = 0; i < g_pipeline; ++i) {

@@ -141,6 +141,17 @@ void QuicStreamEntry::OnFinRead(QuartcStreamInterface* stream)
     finRead_ = true;
 }
 
+QuicByteCount QuicStreamEntry::GetBufferedDataThreshold(QuicByteCount defaultThreshold) const
+{
+    auto socket = socketEntry_.lock();
+    if (!socket) return defaultThreshold;
+
+    QuicByteCount threshold = socket->GetOpt(sockopt_stream_wmem);
+    if (!threshold) return defaultThreshold;
+
+    return threshold;
+}
+
 QuartcStreamPtr QuicStreamEntry::GetQuartcStream()
 {
     // 设置deleter：unlock session::mutex.

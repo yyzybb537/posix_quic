@@ -89,6 +89,8 @@ class QUIC_EXPORT_PRIVATE QuartcStreamInterface {
     virtual void OnCanWriteNewData(QuartcStreamInterface* stream) = 0;
 
     virtual void OnFinRead(QuartcStreamInterface* stream) = 0;
+
+    virtual QuicByteCount GetBufferedDataThreshold(QuicByteCount defaultThreshold) const { return defaultThreshold; }
   };
 
   // The |delegate| is not owned by QuartcStream.

@@ -60,6 +60,8 @@ class QUIC_EXPORT_PRIVATE QuartcStream : public QuicStream,
 
   void OnFinRead() override;
 
+  QuicByteCount GetBufferedDataThreshold(QuicByteCount defaultThreshold) const override;
+
  private:
   QuartcStreamInterface::Delegate* delegate_ = nullptr;
 };

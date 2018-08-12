@@ -12,6 +12,10 @@ enum eQuicSocketOptionType
     // 链路空闲超时, 由于客户端会发心跳, 这个可以用于server端检测链接是否断开
     sockopt_idle_timeout_secs,
 
+    // QuicStream的发送缓冲区大小 (实际使用可能超过这个值, 但超过的量不会多于一个包)
+    // 默认值 5M, 定义于libquic中.
+    sockopt_stream_wmem,
+
     // 底层udp socket的收发缓冲区大小 (默认设置为5M)
     // 设置这个的时候要注意, server端的连接都是共享同一个udp socket的.
     sockopt_udp_rmem,

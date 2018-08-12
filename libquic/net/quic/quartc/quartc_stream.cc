@@ -51,6 +51,12 @@ void QuartcStream::OnFinRead()
     delegate_->OnFinRead(this);
 }
 
+QuicByteCount QuartcStream::GetBufferedDataThreshold(QuicByteCount defaultThreshold) const
+{
+  DCHECK(delegate_);
+  return delegate_->GetBufferedDataThreshold(defaultThreshold);
+}
+
 void QuartcStream::OnClose() {
   QuicStream::OnClose();
   DCHECK(delegate_);

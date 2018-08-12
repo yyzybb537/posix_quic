@@ -54,6 +54,8 @@ private:
     void OnCanWriteNewData(QuartcStreamInterface* stream) override;
 
     void OnFinRead(QuartcStreamInterface* stream) override;
+
+    QuicByteCount GetBufferedDataThreshold(QuicByteCount defaultThreshold) const override;
     // -----------------------------------------------------------------
 
 private:

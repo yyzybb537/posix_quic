@@ -801,7 +801,7 @@ uint64_t QuicStream::BufferedDataBytes() const {
 }
 
 bool QuicStream::CanWriteNewData() const {
-  return BufferedDataBytes() < buffered_data_threshold_;
+  return BufferedDataBytes() < GetBufferedDataThreshold(buffered_data_threshold_);
 }
 
 uint64_t QuicStream::stream_bytes_written() const {

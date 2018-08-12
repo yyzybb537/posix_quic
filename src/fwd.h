@@ -10,8 +10,9 @@
 
 namespace posix_quic {
 
-using net::QuicConnectionId;
-using net::QuicStreamId;
+using QuicConnectionId = net::QuicConnectionId;
+using QuicStreamId = net::QuicStreamId;
+using QuicByteCount = net::QuicByteCount;
 using QuicSocketAddress = net::QuicSocketAddress;
 using QuartcStream = net::QuartcStream;
 using QuartcStreamInterface = net::QuartcStreamInterface;
