@@ -94,10 +94,10 @@ void show() {
 }
 
 int main() {
-    debug_mask = dbg_all & ~dbg_timer;
+//    debug_mask = dbg_all & ~dbg_timer;
 //    debug_mask = dbg_close | dbg_ack_timeout | dbg_conn_visitor;
 //    debug_mask = dbg_simple;
-//    debug_mask = dbg_close;
+    debug_mask = dbg_close;
 
 //    GProfiler::Initialize();
 
@@ -111,11 +111,15 @@ int main() {
     addr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
     ServerConnection s(&ios);
+    SetQuicSocketOpt(s.Native(), sockopt_udp_rmem, 50 * 1024 * 1024);
+    SetQuicSocketOpt(s.Native(), sockopt_udp_wmem, 50 * 1024 * 1024);
+
     int res = s.Accept((struct sockaddr*)&addr, sizeof(addr));
     if (res < 0) {
         perror("Accept error");
         exit(1);
     }
+
 
     ios.RunLoop();
 //    for (;;) {

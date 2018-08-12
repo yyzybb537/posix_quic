@@ -107,9 +107,9 @@ public:
 };
 
 int main() {
-    debug_mask = dbg_all & ~dbg_timer;
+//    debug_mask = dbg_all & ~dbg_timer;
 //    debug_mask = dbg_simple;
-//    debug_mask = dbg_close;
+    debug_mask = dbg_close;
 
     std::thread(&show).detach();
 

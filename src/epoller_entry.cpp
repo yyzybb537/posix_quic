@@ -266,7 +266,7 @@ retry_wait:
         QuicSocketEntryPtr owner;
         QuicSocketAddress selfAddress(GetLocalAddress(udpFd));
 
-        for (int j = 0; j < 1024; ++j) {
+        for (int j = 0; j < 10240; ++j) {
             struct sockaddr_storage addr = {};
             socklen_t addrLen = sizeof(addr);
 retry_recvfrom:

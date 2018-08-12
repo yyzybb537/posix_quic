@@ -115,6 +115,22 @@ int QuicSocketEntry::CreateNewUdpSocket()
         return -1;
     }
 
+    val = GetOpt(sockopt_udp_rmem);
+    if (!val) val = kDefaultUdpRecvMem;
+    res = setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (const char*)&val, sizeof(int));
+    if (res == -1) {
+        ::close(fd);
+        return -1;
+    }
+
+    val = GetOpt(sockopt_udp_wmem);
+    if (!val) val = kDefaultUdpWriteMem;
+    res = setsockopt(fd, SOL_SOCKET, SO_SNDBUF, (const char*)&val, sizeof(int));
+    if (res == -1) {
+        ::close(fd);
+        return -1;
+    }
+
     udpSocket_.reset(new int(fd), [](int* p){
                 ::close(*p);
                 delete p;
@@ -157,6 +173,26 @@ void QuicSocketEntry::SetOpt(int type, long value)
                 impl_->config()->SetIdleNetworkTimeout(QuicTime::Delta::FromSeconds(value),
                         QuicTime::Delta::FromSeconds(value));
                 impl_->connection()->SetFromConfig(*impl_->config());
+            }
+            break;
+
+        case sockopt_udp_rmem:
+            {
+                std::unique_lock<std::recursive_mutex> lock(mtx_);
+                if (udpSocket_) {
+                    int val = value;
+                    setsockopt(*udpSocket_, SOL_SOCKET, SO_RCVBUF, (const char*)&val, sizeof(int));
+                }
+            }
+            break;
+
+        case sockopt_udp_wmem:
+            {
+                std::unique_lock<std::recursive_mutex> lock(mtx_);
+                if (udpSocket_) {
+                    int val = value;
+                    setsockopt(*udpSocket_, SOL_SOCKET, SO_SNDBUF, (const char*)&val, sizeof(int));
+                }
             }
             break;
     }
