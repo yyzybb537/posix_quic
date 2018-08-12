@@ -423,6 +423,20 @@ int QuicEpollWait(QuicEpoller epfd, struct epoll_event *events, int maxevents, i
     return res;
 }
 
+int QuicNativeUdpSocket(QuicSocket sock)
+{
+    auto socket = EntryBase::GetFdManager().Get(sock);
+    if (!socket || socket->Category() != EntryCategory::Socket) {
+        DebugPrint(dbg_api, "sock = %d, return = -1", sock);
+        return -1;
+    }
+
+    auto pUdp = ((QuicSocketEntry*)socket.get())->NativeUdpFd();
+    int fd = pUdp ? *pUdp : -1;
+    DebugPrint(dbg_api, "sock = %d, return udp fd = %d", sock, fd);
+    return fd;
+}
+
 uint64_t GetQuicConnectionId(QuicSocket sock)
 {
     auto socket = EntryBase::GetFdManager().Get(sock);

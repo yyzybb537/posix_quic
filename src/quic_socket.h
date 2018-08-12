@@ -85,6 +85,10 @@ int QuicEpollCtl(QuicEpoller epfd, int op, int quicFd, struct epoll_event *event
 
 int QuicEpollWait(QuicEpoller epfd, struct epoll_event *events, int maxevents, int timeout);
 
+// --------------------
+// 获取底层udp socket的文件描述符
+int QuicNativeUdpSocket(QuicSocket sock);
+
 // ---- for debug -----
 uint64_t GetQuicConnectionId(QuicSocket sock);
 
