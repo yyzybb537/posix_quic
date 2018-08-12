@@ -10,10 +10,9 @@ namespace posix_quic {
 
 // 定时器
 class QuicTaskRunner
-    : public QuartcTaskRunnerInterface
 {
 public:
-    using QuartcTaskRunnerInterface::Task;
+    typedef QuartcTaskRunnerInterface::Task Task;
 
     struct TaskStorage;
     typedef std::shared_ptr<TaskStorage> TaskStoragePtr;
@@ -28,6 +27,7 @@ public:
         SpinLock callLock;
         QuicTaskRunner * runner_;
         uint64_t connectionId = -1;
+        std::recursive_mutex * mtx = nullptr;
 
         inline static long& StaticTaskId() {
             static long taskId = 0;
@@ -63,10 +63,8 @@ public:
     };
 
     std::unique_ptr<QuartcTaskRunnerInterface::ScheduledTask>
-        Schedule(Task* task, uint64_t delay_ms) override;
-
-    std::unique_ptr<QuartcTaskRunnerInterface::ScheduledTask>
-        Schedule(Task* task, uint64_t delay_ms, uint64_t connectionId);
+        Schedule(Task* task, uint64_t delay_ms, uint64_t connectionId,
+                std::recursive_mutex * mtx);
 
     void Cancel(TaskMap::iterator itr);
 
@@ -128,7 +126,10 @@ public:
 
     void Cancel(StoragePtr storage);
 
-    void SetConnectionId(uint64_t connectionId) { connectionId_ = connectionId; }
+    void Initialize(uint64_t connectionId, std::recursive_mutex * mtx) {
+        connectionId_ = connectionId;
+        mtx_ = mtx;
+    }
 
 private:
     std::unordered_map<Storage*, StoragePtr> storages_;
@@ -136,6 +137,8 @@ private:
     QuicTaskRunner *runner_ = nullptr;
 
     uint64_t connectionId_ = -1;
+
+    std::recursive_mutex * mtx_ = nullptr;
 };
 
 } // namespace posix_quic

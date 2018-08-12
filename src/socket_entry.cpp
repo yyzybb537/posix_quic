@@ -30,7 +30,6 @@ QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry(bool isServer, QuicConnec
         id = QuicRandom::GetInstance()->RandUint64();
 
     std::shared_ptr<QuicTaskRunnerProxy> taskRunnerProxy(new QuicTaskRunnerProxy);
-    taskRunnerProxy->SetConnectionId(id);
 
     std::shared_ptr<QuartcFactory> factory(new QuartcFactory(
             QuartcFactoryConfig{taskRunnerProxy.get(), &QuicClockImpl::getInstance()},
@@ -58,6 +57,7 @@ QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry(bool isServer, QuicConnec
     QuicSocketSession* session = (QuicSocketSession*)factory->CreateQuartcSession(config).release();
 
     QuicSocketEntryPtr sptr(new QuicSocketEntry(session));
+    taskRunnerProxy->Initialize(id, &sptr->mtx_);
     sptr->SetFd(fd);
     sptr->factory_ = factory;
     sptr->packetTransport_ = packetTransport;

@@ -5,19 +5,15 @@
 namespace posix_quic {
 
 std::unique_ptr<QuartcTaskRunnerInterface::ScheduledTask>
-QuicTaskRunner::Schedule(Task* task, uint64_t delay_ms)
-{
-    return Schedule(task, delay_ms, -1);
-}
-
-std::unique_ptr<QuartcTaskRunnerInterface::ScheduledTask>
-QuicTaskRunner::Schedule(Task* task, uint64_t delay_ms, uint64_t connectionId)
+QuicTaskRunner::Schedule(Task* task, uint64_t delay_ms, uint64_t connectionId,
+        std::recursive_mutex * mtx)
 {
     int64_t d = QuicClockImpl::getInstance().NowMicroseconds() / 1000 + delay_ms;
     TaskStoragePtr storage(new TaskStorage);
     storage->task = task;
     storage->runner_ = this;
     storage->connectionId = connectionId;
+    storage->mtx = mtx;
 
     std::unique_lock<std::mutex> lock(mtx_);
     auto itr = tasks_.insert(TaskMap::value_type(d, storage));
@@ -72,6 +68,7 @@ void QuicTaskRunner::RunOnce()
             std::unique_lock<SpinLock> lock(storage->callLock, std::defer_lock);
             if (lock.try_lock()) {
                 TlsConnectionIdGuard guard(storage->connectionId);
+                std::unique_lock<std::recursive_mutex> lock(*storage->mtx);
                 storage->task->Run();
             }
         }
@@ -89,7 +86,7 @@ QuicTaskRunnerProxy::Schedule(Task* task, uint64_t delay_ms)
     StoragePtr storage(new Storage(task, deadline, this));
     storages_[storage.get()] = storage;
     if (runner_) {
-        storage->link_ = runner_->Schedule(storage->task_, delay_ms, connectionId_);
+        storage->link_ = runner_->Schedule(storage->task_, delay_ms, connectionId_, mtx_);
     }
     return std::unique_ptr<QuartcTaskRunnerInterface::ScheduledTask>(
             static_cast<QuartcTaskRunnerInterface::ScheduledTask*>(
@@ -104,7 +101,7 @@ bool QuicTaskRunnerProxy::Link(QuicTaskRunner *runner)
         StoragePtr & storage = kv.second;
         int64_t now = QuicClockImpl::getInstance().NowMicroseconds() / 1000;
         uint64_t delay_ms = now > storage->deadline_ ? 0 : (storage->deadline_ - now);
-        storage->link_ = runner_->Schedule(storage->task_, delay_ms, connectionId_);
+        storage->link_ = runner_->Schedule(storage->task_, delay_ms, connectionId_, mtx_);
     }
     return true;
 }
