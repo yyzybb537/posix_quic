@@ -174,9 +174,14 @@ int QuicEpollerEntry::ModInner(int fd, struct epoll_event * event)
         return -1;
     }
 
+    int pollevent = Epoll2Poll(event->events);
+
     auto & qev = itr->second.second;
-    qev->events = Epoll2Poll(event->events);
+    qev->events = pollevent;
     qev->data = event->data;
+    if (pollevent & POLLOUT) {
+        qev->revents |= POLLOUT;
+    }
     return 0;
 }
 int QuicEpollerEntry::Del(int fd)
