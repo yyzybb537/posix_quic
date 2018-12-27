@@ -104,6 +104,16 @@ int QuicSocketEntry::CreateNewUdpSocket()
     int fd = ::socket(AF_INET, SOCK_DGRAM, 0);
     if (fd == -1) return -1;
 
+    return SetUdpSocket(fd);
+}
+
+int QuicSocketEntry::SetUdpSocket(int fd)
+{
+    if (udpSocket_) {
+        errno = EINVAL;
+        return -1;
+    }
+
     int val = ::fcntl(fd, F_GETFL, 0);
     if (val == -1) {
         ::close(fd);
@@ -225,6 +235,25 @@ int QuicSocketEntry::Bind(const struct sockaddr* addr, socklen_t addrlen)
             return -1;
     }
 }
+
+int QuicSocketEntry::Bind(int udpFd)
+{
+    switch (socketState_) {
+        case QuicSocketState_None:
+            {
+               int res = SetUdpSocket(udpFd);
+               if (res == 0)
+                   socketState_ = QuicSocketState_Binded;
+               return res;
+            }
+
+        case QuicSocketState_Inited:
+        default:
+            errno = EINVAL;
+            return -1;
+    }
+}
+
 int QuicSocketEntry::Connect(const struct sockaddr* addr, socklen_t addrlen)
 {
     DebugPrint(dbg_connect, "begin. fd = %d", Fd());

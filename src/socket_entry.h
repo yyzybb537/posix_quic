@@ -58,6 +58,8 @@ public:
 
     int Bind(const struct sockaddr* addr, socklen_t addrlen);
 
+    int Bind(int udpFd);
+
     int Connect(const struct sockaddr* addr, socklen_t addrlen);
 
     int Close() override;
@@ -114,6 +116,8 @@ private:
     void PushAcceptQueue(QuicSocketEntryPtr entry);
 
     int CreateNewUdpSocket();
+
+    int SetUdpSocket(int fd);
 
     void ClearAcceptSocketByClose();
 

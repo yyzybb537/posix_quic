@@ -40,6 +40,8 @@ const char* QuicErrorToString(int quicErrorCode);
 
 int QuicBind(QuicSocket sock, const struct sockaddr* addr, socklen_t addrlen);
 
+int QuicBindUdp(QuicSocket sock, int udpFd);
+
 int QuicListen(QuicSocket sock, int backlog);
 
 int QuicConnect(QuicSocket sock, const struct sockaddr* addr, socklen_t addrlen);

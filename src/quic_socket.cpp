@@ -65,6 +65,20 @@ int QuicBind(QuicSocket sock, const struct sockaddr* addr, socklen_t addrlen)
     return res;
 }
 
+int QuicBindUdp(QuicSocket sock, int udpFd)
+{
+    auto socket = EntryBase::GetFdManager().Get(sock);
+    if (!socket || socket->Category() != EntryCategory::Socket) {
+        DebugPrint(dbg_api, "sock = %d, return = -1, errno = EBADF", sock);
+        errno = EBADF;
+        return -1;
+    }
+
+    int res = ((QuicSocketEntry*)socket.get())->Bind(udpFd);
+    DebugPrint(dbg_api, "sock = %d, return = %d, errno = %d", sock, res, errno);
+    return res;
+}
+
 int QuicListen(QuicSocket sock, int backlog)
 {
     // TODO: limit acceptQueue size.
