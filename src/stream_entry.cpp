@@ -107,6 +107,26 @@ int QuicStreamEntry::Close()
     ClearWaitingsByClose();
     return 0;
 }
+int QuicStreamEntry::GetSockName(struct sockaddr* addr, socklen_t *addrlen)
+{
+    auto socket = socketEntry_.lock();
+    if (!socket) {
+        errno = EBADF;
+        return -1;
+    }
+
+    return socket->GetSockName(addr, addrlen);
+}
+int QuicStreamEntry::GetPeerName(struct sockaddr* addr, socklen_t *addrlen)
+{
+    auto socket = socketEntry_.lock();
+    if (!socket) {
+        errno = EBADF;
+        return -1;
+    }
+
+    return socket->GetPeerName(addr, addrlen);
+}
 void QuicStreamEntry::DeleteQuicStream(QuicStreamEntryPtr const& ptr)
 {
     int fd = ptr->Fd();

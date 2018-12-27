@@ -312,6 +312,40 @@ int QuicSocketEntry::Close()
     ClearAcceptSocketByClose();
     return 0;
 }
+
+int QuicSocketEntry::GetSockName(struct sockaddr* addr, socklen_t *addrlen)
+{
+    if (!udpSocket_) {
+        errno = EBADF;
+        return -1;
+    }
+
+    return ::getsockname(*udpSocket_, addr, addrlen);
+}
+
+int QuicSocketEntry::GetPeerName(struct sockaddr* addr, socklen_t *addrlen)
+{
+    auto ipaddress = impl_->peer_address().impl().socket_address();
+    if (ipaddress.GetFamily() == net::ADDRESS_FAMILY_IPV4 && *addrlen < sizeof(struct sockaddr_in)) {
+        *addrlen = sizeof(struct sockaddr_in);
+        errno = EINVAL;
+        return -1;
+    }
+
+    if (ipaddress.GetFamily() == net::ADDRESS_FAMILY_IPV6 && *addrlen < sizeof(struct sockaddr_in6)) {
+        *addrlen = sizeof(struct sockaddr_in6);
+        errno = EINVAL;
+        return -1;
+    }
+
+    bool ret = ipaddress.ToSockAddr(addr, addrlen);
+    if (ret) return 0;
+
+    *addrlen = sizeof(struct sockaddr_in6);
+    errno = EINVAL;
+    return -1;
+}
+
 QuicSocketEntryPtr QuicSocketEntry::AcceptSocket()
 {
     if (socketState_ != QuicSocketState_Binded) {

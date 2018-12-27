@@ -264,6 +264,7 @@ int SetQuicSocketOpt(QuicSocket sock, int type, int64_t value)
 
     ((QuicSocketEntry*)socket.get())->SetOpt(type, value);
     errno = 0;
+    DebugPrint(dbg_api, "sock = %d, return = 0, errno = 0", sock);
     return 0;
 }
 
@@ -278,7 +279,50 @@ int GetQuicSocketOpt(QuicSocket sock, int type, int64_t* value)
 
     *value = ((QuicSocketEntry*)socket.get())->GetOpt(type);
     errno = 0;
+    DebugPrint(dbg_api, "sock = %d, return = 0, errno = 0", sock);
     return 0;
+}
+
+int QuicGetSockName(QuicSocketOrStream fd, struct sockaddr* addr, socklen_t *addrlen)
+{
+    auto socket = EntryBase::GetFdManager().Get(fd);
+    if (!socket) {
+        DebugPrint(dbg_api, "sock = %d, return = -1, errno = EBADF", fd);
+        errno = EBADF;
+        return -1;
+    }
+
+    int ret = -1;
+    errno = EBADF;
+    if (socket->Category() == EntryCategory::Socket) {
+        ret = ((QuicSocketEntry*)socket.get())->GetSockName(addr, addrlen);
+    } else if (socket->Category() == EntryCategory::Stream) {
+        ret = ((QuicStreamEntry*)socket.get())->GetSockName(addr, addrlen);
+    }
+
+    DebugPrint(dbg_api, "fd = %d, return = %d, errno = %d", fd, ret, errno);
+    return ret;
+}
+
+int QuicGetPeerName(QuicSocketOrStream fd, struct sockaddr* addr, socklen_t *addrlen)
+{
+    auto socket = EntryBase::GetFdManager().Get(fd);
+    if (!socket) {
+        DebugPrint(dbg_api, "sock = %d, return = -1, errno = EBADF", fd);
+        errno = EBADF;
+        return -1;
+    }
+
+    int ret = -1;
+    errno = EBADF;
+    if (socket->Category() == EntryCategory::Socket) {
+        ret = ((QuicSocketEntry*)socket.get())->GetPeerName(addr, addrlen);
+    } else if (socket->Category() == EntryCategory::Stream) {
+        ret = ((QuicStreamEntry*)socket.get())->GetPeerName(addr, addrlen);
+    }
+
+    DebugPrint(dbg_api, "fd = %d, return = %d, errno = %d", fd, ret, errno);
+    return ret;
 }
 
 // poll

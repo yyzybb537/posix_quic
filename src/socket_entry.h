@@ -64,6 +64,10 @@ public:
 
     int Close() override;
 
+    int GetSockName(struct sockaddr* addr, socklen_t *addrlen);
+
+    int GetPeerName(struct sockaddr* addr, socklen_t *addrlen);
+
     QuicSocketEntryPtr AcceptSocket();
 
     QuicStreamEntryPtr AcceptStream();

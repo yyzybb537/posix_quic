@@ -29,6 +29,10 @@ public:
 
     int Close() override;
 
+    int GetSockName(struct sockaddr* addr, socklen_t *addrlen);
+
+    int GetPeerName(struct sockaddr* addr, socklen_t *addrlen);
+
 public:
     template <typename ... Args>
     static QuicStreamEntryPtr NewQuicStream(Args && ... args) {

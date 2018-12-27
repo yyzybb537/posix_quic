@@ -75,6 +75,11 @@ int SetQuicSocketOpt(QuicSocket sock, int type, int64_t value);
 
 int GetQuicSocketOpt(QuicSocket sock, int type, int64_t* value);
 
+// get local/remote address
+int QuicGetSockName(QuicSocketOrStream fd, struct sockaddr* addr, socklen_t* addrlen);
+
+int QuicGetPeerName(QuicSocketOrStream fd, struct sockaddr* addr, socklen_t* addrlen);
+
 // poll
 //int QuicPoll(struct pollfd *fds, nfds_t nfds, int timeout);
 
