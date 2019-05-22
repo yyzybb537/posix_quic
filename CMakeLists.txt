@@ -41,3 +41,16 @@ include_directories(${PROJECT_SOURCE_DIR}/libquic/third_party/protobuf/src)
 add_subdirectory(${PROJECT_SOURCE_DIR}/libquic)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/simple simple)
+
+# install
+install(TARGETS ${TARGET} ARCHIVE DESTINATION "lib")
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libquic/libquic.a DESTINATION "lib")
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libquic/third_party/boringssl/src/ssl/libssl.a DESTINATION "lib")
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libquic/third_party/boringssl/src/crypto/libcrypto.a DESTINATION "lib")
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libquic/third_party/boringssl/src/decrepit/libdecrepit.a DESTINATION "lib")
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libquic/third_party/protobuf/src/libprotobuf.a DESTINATION "lib")
+
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/ DESTINATION "include/posix_quic")
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/libquic/ DESTINATION "include/posix_quic")
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/libquic/third_party/boringssl/src/include DESTINATION "include/posix_quic")
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/libquic/third_party/protobuf/src/google DESTINATION "include/posix_quic/google")
