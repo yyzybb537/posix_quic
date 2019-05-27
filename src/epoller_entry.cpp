@@ -11,14 +11,17 @@ namespace posix_quic {
 
 void QuicEpollerEntry::EpollTrigger::OnTrigger(short int event)
 {
-    if ((event & POLLERR) == 0) return ;
-
     // mod fd
     epollEntry->Notify();
 }
 
 void QuicEpollerEntry::Notify()
 {
+    if (notifyProtect_.test_and_set()) {
+        DebugPrint(dbg_event, "Fake Notify epfd = %d", Fd());
+        return ;
+    }
+
     struct epoll_event ev;
     ev.events = EPOLLOUT | EPOLLET;
     ev.data.fd = socketPair_[0];
@@ -230,12 +233,17 @@ int QuicEpollerEntry::DelInner(int fd)
 
 int QuicEpollerEntry::Wait(struct epoll_event *events, int maxevents, int timeout)
 {
+    DebugPrint(dbg_epoll, "QuicEpollerEntry::Wait begin");
+
     size_t udpSize = std::max<size_t>(udps_.size() + 1, 1);
     udpEvents_.resize(std::min<size_t>(udpSize, 10240));
     udpRecvBuf_.resize(65 * 1024);
     
     int res = Poll(events, maxevents);
-    if (res > 0) return res;
+    if (res > 0) {
+        DebugPrint(dbg_epoll, "QuicEpollerEntry::Wait poll success. returns %d", res);
+        return res;
+    }
 
     int64_t deadline = QuicClockImpl::getInstance().NowMS() + timeout;
 
@@ -258,6 +266,9 @@ retry_wait:
         if (res > 0) break;
         if (res == 0 && (onceTimeout == 0 || timeRemain == onceTimeout)) break;
     }
+
+    // clear notify flag
+    notifyProtect_.clear();
 
     for (int i = 0; i < res; ++i) {
         struct epoll_event & ev = udpEvents_[i];
@@ -345,7 +356,9 @@ retry_recvfrom:
         }
     }
 
-    return Poll(events, maxevents);
+    res = Poll(events, maxevents);
+    DebugPrint(dbg_epoll, "QuicEpollerEntry::Wait returns %d", res);
+    return res;
 }
 int QuicEpollerEntry::Poll(struct epoll_event *events, int maxevents)
 {
@@ -363,8 +376,8 @@ int QuicEpollerEntry::Poll(struct epoll_event *events, int maxevents)
         short int revents = __atomic_fetch_and(&qev.revents, ~event, std::memory_order_seq_cst);
         revents &= event;
 
-//        DebugPrint(dbg_event, "after __atomic_fetch_and fd = %d, qev.revents = %s, revents = %s",
-//                kv.first, PollEvent2Str(qev.revents), PollEvent2Str(revents));
+        DebugPrint(dbg_event, "after __atomic_fetch_and fd = %d, qev.revents = %s, revents = %s",
+                kv.first, PollEvent2Str(qev.revents), PollEvent2Str(revents));
 
         if (revents == 0) continue;
 
@@ -373,6 +386,7 @@ int QuicEpollerEntry::Poll(struct epoll_event *events, int maxevents)
         ev.events = Poll2Epoll(revents);
     }
 
+    DebugPrint(dbg_epoll, "QuicEpollerEntry::Poll returns %d", i);
     return i;
 }
 FdManager<QuicEpollerEntryPtr> & QuicEpollerEntry::GetFdManager()

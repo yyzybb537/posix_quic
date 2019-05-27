@@ -84,6 +84,7 @@ private:
     int socketPair_[2];
     HeaderParser headerParser_;
     QuicTaskRunner taskRunner_;
+    std::atomic_flag notifyProtect_{false};
 };
 
 } // namespace posix_quic
