@@ -56,6 +56,8 @@ QuicStream QuicStreamAccept(QuicSocket sock);
 
 QuicStream QuicCreateStream(QuicSocket sock);
 
+uint32_t QuicGetStreamId(QuicStream stream);
+
 int QuicCloseStream(QuicStream stream);
 
 int QuicStreamShutdown(QuicStream stream, int how);

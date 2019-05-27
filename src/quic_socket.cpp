@@ -178,6 +178,21 @@ QuicStream QuicCreateStream(QuicSocket sock)
     return stream->Fd();
 }
 
+uint32_t QuicGetStreamId(QuicStream stream)
+{
+    auto entry = EntryBase::GetFdManager().Get(stream);
+    if (!entry || entry->Category() != EntryCategory::Stream) {
+        DebugPrint(dbg_api, "stream = %d, return = -1, errno = EBADF", stream);
+        errno = EBADF;
+        return -1;
+    }
+
+    auto streamPtr = std::dynamic_pointer_cast<QuicStreamEntry>(entry);
+    uint32_t streamId = streamPtr->GetStreamId();
+    DebugPrint(dbg_api, "stream = %d, return = %u", stream, streamId);
+    return streamId;
+}
+
 int QuicCloseStream(QuicStream stream)
 {
     auto entry = EntryBase::GetFdManager().Get(stream);

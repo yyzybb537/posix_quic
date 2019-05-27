@@ -33,6 +33,8 @@ public:
 
     int GetPeerName(struct sockaddr* addr, socklen_t *addrlen);
 
+    QuicStreamId GetStreamId() const { return streamId_; }
+
 public:
     template <typename ... Args>
     static QuicStreamEntryPtr NewQuicStream(Args && ... args) {
