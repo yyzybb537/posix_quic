@@ -58,18 +58,20 @@ ssize_t QuicStreamEntry::Readv(const struct iovec* iov, size_t iov_count)
         return -1;
     }
 
-    int res = stream->Readv(iov, iov_count);
+    size_t pos = 0;
+    for (size_t i = 0; i < iov_count && pos < recvBuffer_.size(); ++i) {
+        size_t copyBytes = (std::min)(recvBuffer_.size() - pos, iov[i].iov_len);
+        memcpy(iov[i].iov_base, &recvBuffer_[pos], copyBytes);
+        pos += copyBytes;
+    }
+    
+    if (pos == recvBuffer_.size())
+        recvBuffer_.clear();
+    else
+        recvBuffer_.erase(0, pos);
+
+    int res = (int)pos;
     if (res == 0) {
-        if (Error()) {
-            errno = Error();
-            return -1;
-        }
-
-        if (finRead_) {
-            errno = 0;
-            return 0;
-        }
-
         errno = EAGAIN;
         return -1;
     }
@@ -137,9 +139,12 @@ void QuicStreamEntry::DeleteQuicStream(QuicStreamEntryPtr const& ptr)
     }
 }
 
-void QuicStreamEntry::OnDataAvailable(QuartcStreamInterface* stream)
+void QuicStreamEntry::OnReceived(QuartcStreamInterface* stream, const char* data, size_t size)
 {
-    SetReadable(true);
+    bool trigger = recvBuffer_.empty();
+    recvBuffer_.append(data, size);
+    if (trigger)
+        SetReadable(true);
 }
 
 void QuicStreamEntry::OnClose(QuartcStreamInterface* stream)

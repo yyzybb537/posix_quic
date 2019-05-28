@@ -54,8 +54,6 @@ class QUIC_EXPORT_PRIVATE QuartcStream : public QuicStream,
 
   void OnCanWriteNewData() override;
 
-  int Readv(const struct iovec* iov, size_t iov_len);
-
   QuicConsumedData WritevData(const struct iovec* iov, int iov_count, bool fin);
 
   void OnFinRead() override;

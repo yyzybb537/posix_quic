@@ -51,7 +51,7 @@ public:
     // -----------------------------------------------------------------
     // QuartcStreamInterface::Delegate
 private:
-    void OnDataAvailable(QuartcStreamInterface* stream) override;
+    void OnReceived(QuartcStreamInterface* stream, const char* data, size_t size) override;
 
     void OnClose(QuartcStreamInterface* stream) override;
 
@@ -75,6 +75,8 @@ private:
     QuicStreamId streamId_;
 
     bool finRead_ = false;
+
+    std::string recvBuffer_;
 };
 
 

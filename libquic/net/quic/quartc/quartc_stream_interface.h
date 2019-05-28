@@ -70,11 +70,9 @@ class QUIC_EXPORT_PRIVATE QuartcStreamInterface {
 
     // Called when the stream receives the data.  Called with |size| == 0 after
     // all stream data has been delivered.
-//    virtual void OnReceived(QuartcStreamInterface* stream,
-//                            const char* data,
-//                            size_t size) = 0;
-
-    virtual void OnDataAvailable(QuartcStreamInterface* stream) = 0;
+    virtual void OnReceived(QuartcStreamInterface* stream,
+                            const char* data,
+                            size_t size) = 0;
 
     // Called when the stream is closed, either locally or by the remote
     // endpoint.  Streams close when (a) fin bits are both sent and received,
