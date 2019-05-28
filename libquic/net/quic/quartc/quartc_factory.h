@@ -15,21 +15,6 @@
 
 namespace net {
 
-typedef QuartcSessionInterface* (*NewQuartcSessionFn)(std::unique_ptr<QuicConnection> connection,
-                const QuicConfig& config,
-                const std::string& unique_remote_server_id,
-                Perspective perspective,
-                QuicConnectionHelperInterface* helper,
-                QuicClock* clock);
-
-
-QuartcSessionInterface* DefaultNewQuartcSessionFn(std::unique_ptr<QuicConnection> connection,
-                const QuicConfig& config,
-                const std::string& unique_remote_server_id,
-                Perspective perspective,
-                QuicConnectionHelperInterface* helper,
-                QuicClock* clock);
-
 // Implements the QuartcFactoryInterface to create the instances of
 // QuartcSessionInterface. Implements the QuicAlarmFactory to create alarms
 // using the QuartcTaskRunner. Implements the QuicConnectionHelperInterface used
@@ -38,7 +23,7 @@ class QUIC_EXPORT_PRIVATE QuartcFactory : public QuartcFactoryInterface,
                                           public QuicAlarmFactory,
                                           public QuicConnectionHelperInterface {
  public:
-  explicit QuartcFactory(const QuartcFactoryConfig& factory_config, NewQuartcSessionFn fn = &DefaultNewQuartcSessionFn);
+  explicit QuartcFactory(const QuartcFactoryConfig& factory_config);
   ~QuartcFactory() override;
 
   // QuartcFactoryInterface overrides.
@@ -71,8 +56,6 @@ class QUIC_EXPORT_PRIVATE QuartcFactory : public QuartcFactoryInterface,
   // but the QuartcClockInterface inside of it belongs to the user!
   std::unique_ptr<QuicClock> clock_;
   SimpleBufferAllocator buffer_allocator_;
-
-  NewQuartcSessionFn new_fn_;
 };
 
 }  // namespace net
