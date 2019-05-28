@@ -12,7 +12,6 @@
 #include "net/quic/quartc/quartc_session_interface.h"
 #include "connection_visitor.h"
 #include "task_runner.h"
-#include "session.h"
 
 namespace posix_quic {
 
@@ -23,7 +22,7 @@ class QuicSocketEntry
     private QuartcSessionInterface::Delegate
 {
 public:
-    explicit QuicSocketEntry(QuicSocketSession * session);
+    explicit QuicSocketEntry(QuartcSession * session);
     ~QuicSocketEntry();
 
     EntryCategory Category() const override { return EntryCategory::Socket; }
@@ -128,7 +127,7 @@ private:
 private:
     std::recursive_mutex mtx_;
 
-    std::shared_ptr<QuicSocketSession> impl_;
+    std::shared_ptr<QuartcSession> impl_;
 
     std::shared_ptr<int> udpSocket_;
     QuicSocketState socketState_ = QuicSocketState_None;

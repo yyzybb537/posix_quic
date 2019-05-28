@@ -14,7 +14,7 @@ namespace posix_quic {
 
 using namespace net;
 
-QuicSocketEntry::QuicSocketEntry(QuicSocketSession * session)
+QuicSocketEntry::QuicSocketEntry(QuartcSession * session)
     : impl_(session)
 {
 }
@@ -32,17 +32,7 @@ QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry(bool isServer, QuicConnec
     std::shared_ptr<QuicTaskRunnerProxy> taskRunnerProxy(new QuicTaskRunnerProxy);
 
     std::shared_ptr<QuartcFactory> factory(new QuartcFactory(
-            QuartcFactoryConfig{taskRunnerProxy.get(), &QuicClockImpl::getInstance()},
-            []( std::unique_ptr<QuicConnection> connection,
-                const QuicConfig& config, const std::string& unique_remote_server_id,
-                Perspective perspective,
-                QuicConnectionHelperInterface* helper,
-                QuicClock* clock )
-            {
-                return static_cast<QuartcSessionInterface*>(new QuicSocketSession(
-                        std::move(connection), config, unique_remote_server_id,
-                        perspective, helper, clock));
-            }));
+            QuartcFactoryConfig{taskRunnerProxy.get(), &QuicClockImpl::getInstance()}));
 
     int fd = GetFdFactory().Alloc();
     std::shared_ptr<PosixQuicPacketTransport> packetTransport(new PosixQuicPacketTransport);
@@ -54,7 +44,7 @@ QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry(bool isServer, QuicConnec
     config.connection_id = id;
     config.max_idle_time_before_crypto_handshake_secs = 10;
     config.max_time_before_crypto_handshake_secs = 10;
-    QuicSocketSession* session = (QuicSocketSession*)factory->CreateQuartcSession(config).release();
+    QuartcSession* session = (QuartcSession*)factory->CreateQuartcSession(config).release();
 
     QuicSocketEntryPtr sptr(new QuicSocketEntry(session));
     taskRunnerProxy->Initialize(id, &sptr->mtx_);
