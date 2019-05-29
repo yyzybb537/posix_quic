@@ -71,6 +71,9 @@ ssize_t QuicStreamEntry::Readv(const struct iovec* iov, size_t iov_count)
         recvBuffer_.erase(0, pos);
 
     int res = (int)pos;
+    DebugPrint(dbg_read, "stream fd = %d, remain size = %u, return size = %d",
+            Fd(), (unsigned)recvBuffer_.size(), res);
+
     if (res == 0) {
         errno = EAGAIN;
         return -1;
@@ -141,6 +144,8 @@ void QuicStreamEntry::DeleteQuicStream(QuicStreamEntryPtr const& ptr)
 
 void QuicStreamEntry::OnReceived(QuartcStreamInterface* stream, const char* data, size_t size)
 {
+    DebugPrint(dbg_read, "stream fd = %d, previous size = %u, OnReceived size = %u",
+            Fd(), (unsigned)recvBuffer_.size(), (unsigned)size);
     bool trigger = recvBuffer_.empty();
     recvBuffer_.append(data, size);
     if (trigger)

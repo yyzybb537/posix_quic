@@ -165,7 +165,7 @@ int QuicEpollerEntry::AddInner(int fd, struct epoll_event * event)
 int QuicEpollerEntry::Mod(int fd, struct epoll_event * event)
 {
     int res = ModInner(fd, event);
-    DebugPrint(dbg_epoll, "fd = %d, events = %s", fd, EpollEvent2Str(event->events));
+    DebugPrint(dbg_epoll, "fd = %d, events = %s, return %d", fd, EpollEvent2Str(event->events), res);
     return res;
 }
 int QuicEpollerEntry::ModInner(int fd, struct epoll_event * event)
@@ -183,8 +183,10 @@ int QuicEpollerEntry::ModInner(int fd, struct epoll_event * event)
     qev->events = pollevent;
     qev->data = event->data;
     if (pollevent & POLLOUT) {
-        qev->revents |= POLLOUT;
+        __atomic_fetch_or(&qev->revents, POLLOUT, std::memory_order_seq_cst);
     }
+    Notify();
+    DebugPrint(dbg_epoll, "fd = %d, revents = %s", fd, PollEvent2Str(qev->revents));
     return 0;
 }
 int QuicEpollerEntry::Del(int fd)

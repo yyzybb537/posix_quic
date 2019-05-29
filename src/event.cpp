@@ -66,6 +66,8 @@ void Event::TriggerWithoutLock(short int event)
                     DebugPrint(dbg_event, "fd = %d, epfd = %d, trigger event = POLLIN. waiter.revents = %s",
                             Fd(), trigger->epollfd, PollEvent2Str(*waiter.revents));
                     __atomic_fetch_or(waiter.revents, POLLIN, std::memory_order_seq_cst);
+                    DebugPrint(dbg_event, "fd = %d, epfd = %d, trigger event = POLLIN. waiter.revents = %s",
+                            Fd(), trigger->epollfd, PollEvent2Str(*waiter.revents));
                     trigger->Trigger(POLLIN);
                 }
                 break;
@@ -75,6 +77,8 @@ void Event::TriggerWithoutLock(short int event)
                     DebugPrint(dbg_event, "fd = %d, epfd = %d, trigger event = POLLOUT. waiter.revents = %s",
                             Fd(), trigger->epollfd, PollEvent2Str(*waiter.revents));
                     __atomic_fetch_or(waiter.revents, POLLOUT, std::memory_order_seq_cst);
+                    DebugPrint(dbg_event, "fd = %d, epfd = %d, trigger event = POLLOUT. waiter.revents = %s",
+                            Fd(), trigger->epollfd, PollEvent2Str(*waiter.revents));
                     trigger->Trigger(POLLOUT);
                 }
                 break;
@@ -83,6 +87,8 @@ void Event::TriggerWithoutLock(short int event)
                 DebugPrint(dbg_event, "fd = %d, epfd = %d, trigger event = POLLERR. waiter.revents = %s",
                         Fd(), trigger->epollfd, PollEvent2Str(*waiter.revents));
                 __atomic_fetch_or(waiter.revents, POLLERR, std::memory_order_seq_cst);
+                DebugPrint(dbg_event, "fd = %d, epfd = %d, trigger event = POLLERR. waiter.revents = %s",
+                        Fd(), trigger->epollfd, PollEvent2Str(*waiter.revents));
                 trigger->Trigger(POLLERR);
                 break;
 
