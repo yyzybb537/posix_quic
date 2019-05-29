@@ -23,11 +23,11 @@ public:
         long id;
         Task * task;
         TaskMap::iterator itr;
-        std::atomic_flag invalid{false};
+        SpinLock invalid;
         SpinLock callLock;
         QuicTaskRunner * runner_;
         uint64_t connectionId = -1;
-        std::recursive_mutex * mtx = nullptr;
+        std::shared_ptr<std::recursive_mutex> mtx;
 
         inline static long& StaticTaskId() {
             static long taskId = 0;
@@ -42,11 +42,13 @@ public:
         explicit ScheduledTask(TaskStoragePtr storage) : storage_(storage) {}
 
         void Cancel() override {
-            if (!storage_->invalid.test_and_set(std::memory_order_acquire)) {
+            if (storage_->invalid.try_lock()) {
                 DebugPrint(dbg_timer, "cancel schedule(id=%ld)", storage_->id);
                 storage_->runner_->Cancel(storage_->itr);
             } else if (!IsInTaskRunnerThread()) {
+                DebugPrint(dbg_timer, "wait cancel schedule(id=%ld)", storage_->id);
                 storage_->callLock.lock();
+                DebugPrint(dbg_timer, "success cancel schedule(id=%ld)", storage_->id);
             }
         }
         
@@ -64,7 +66,7 @@ public:
 
     std::unique_ptr<QuartcTaskRunnerInterface::ScheduledTask>
         Schedule(Task* task, uint64_t delay_ms, uint64_t connectionId,
-                std::recursive_mutex * mtx);
+                std::shared_ptr<std::recursive_mutex> mtx);
 
     void Cancel(TaskMap::iterator itr);
 
@@ -126,7 +128,7 @@ public:
 
     void Cancel(StoragePtr storage);
 
-    void Initialize(uint64_t connectionId, std::recursive_mutex * mtx) {
+    void Initialize(uint64_t connectionId, std::shared_ptr<std::recursive_mutex> mtx) {
         connectionId_ = connectionId;
         mtx_ = mtx;
     }
@@ -138,7 +140,7 @@ private:
 
     uint64_t connectionId_ = -1;
 
-    std::recursive_mutex * mtx_ = nullptr;
+    std::shared_ptr<std::recursive_mutex> mtx_;
 };
 
 } // namespace posix_quic

@@ -6,7 +6,7 @@ namespace posix_quic {
 
 std::unique_ptr<QuartcTaskRunnerInterface::ScheduledTask>
 QuicTaskRunner::Schedule(Task* task, uint64_t delay_ms, uint64_t connectionId,
-        std::recursive_mutex * mtx)
+        std::shared_ptr<std::recursive_mutex> mtx)
 {
     int64_t d = QuicClockImpl::getInstance().NowMicroseconds() / 1000 + delay_ms;
     TaskStoragePtr storage(new TaskStorage);
@@ -52,7 +52,7 @@ void QuicTaskRunner::RunOnce()
         auto itr = tasks_.begin();
         while (itr != tasks_.end() && now > itr->first) {
             TaskStoragePtr & storage = itr->second;
-            if (!storage->invalid.test_and_set(std::memory_order_acquire)) {
+            if (storage->invalid.try_lock()) {
                 triggers.push_back(storage);
                 itr = tasks_.erase(itr);
             } else {

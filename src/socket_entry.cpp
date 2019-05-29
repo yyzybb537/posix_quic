@@ -15,7 +15,7 @@ namespace posix_quic {
 using namespace net;
 
 QuicSocketEntry::QuicSocketEntry(QuartcSession * session)
-    : impl_(session)
+    : mtx_(std::make_shared<std::recursive_mutex>()), impl_(session)
 {
 }
 
@@ -47,7 +47,7 @@ QuicSocketEntryPtr QuicSocketEntry::NewQuicSocketEntry(bool isServer, QuicConnec
     QuartcSession* session = (QuartcSession*)factory->CreateQuartcSession(config).release();
 
     QuicSocketEntryPtr sptr(new QuicSocketEntry(session));
-    taskRunnerProxy->Initialize(id, &sptr->mtx_);
+    taskRunnerProxy->Initialize(id, sptr->mtx_);
     sptr->SetFd(fd);
     sptr->factory_ = factory;
     sptr->packetTransport_ = packetTransport;
@@ -162,14 +162,14 @@ void QuicSocketEntry::SetOpt(int type, long value)
     switch (type) {
         case sockopt_ack_timeout_secs:
             {
-                std::unique_lock<std::recursive_mutex> lock(mtx_);
+                std::unique_lock<std::recursive_mutex> lock(*mtx_);
                 connectionVisitor_.SetNoAckAlarm();
             }
             break;
 
         case sockopt_idle_timeout_secs:
             {
-                std::unique_lock<std::recursive_mutex> lock(mtx_);
+                std::unique_lock<std::recursive_mutex> lock(*mtx_);
                 impl_->config()->SetIdleNetworkTimeout(QuicTime::Delta::FromSeconds(value),
                         QuicTime::Delta::FromSeconds(value));
                 impl_->connection()->SetFromConfig(*impl_->config());
@@ -178,7 +178,7 @@ void QuicSocketEntry::SetOpt(int type, long value)
 
         case sockopt_udp_rmem:
             {
-                std::unique_lock<std::recursive_mutex> lock(mtx_);
+                std::unique_lock<std::recursive_mutex> lock(*mtx_);
                 if (udpSocket_) {
                     int val = value;
                     setsockopt(*udpSocket_, SOL_SOCKET, SO_RCVBUF, (const char*)&val, sizeof(int));
@@ -188,7 +188,7 @@ void QuicSocketEntry::SetOpt(int type, long value)
 
         case sockopt_udp_wmem:
             {
-                std::unique_lock<std::recursive_mutex> lock(mtx_);
+                std::unique_lock<std::recursive_mutex> lock(*mtx_);
                 if (udpSocket_) {
                     int val = value;
                     setsockopt(*udpSocket_, SOL_SOCKET, SO_SNDBUF, (const char*)&val, sizeof(int));
@@ -289,7 +289,7 @@ int QuicSocketEntry::Close()
     if (socketState_ == QuicSocketState_Closed)
         return 0;
 
-    std::unique_lock<std::recursive_mutex> lock(mtx_);
+    std::unique_lock<std::recursive_mutex> lock(*mtx_);
     if (socketState_ == QuicSocketState_Closed)
         return 0;
 
@@ -378,27 +378,27 @@ QuicStreamEntryPtr QuicSocketEntry::CreateStream()
         return QuicStreamEntryPtr();
     }
 
-    std::unique_lock<std::recursive_mutex> lock(mtx_);
+    std::unique_lock<std::recursive_mutex> lock(*mtx_);
     QuartcStream* stream = impl_->CreateOutgoingDynamicStream();
     return QuicStreamEntry::NewQuicStream(shared_from_this(), stream);
 }
 
 QuartcStreamPtr QuicSocketEntry::GetQuartcStream(QuicStreamId streamId)
 {
-    std::unique_lock<std::recursive_mutex> lock(mtx_);
+    std::unique_lock<std::recursive_mutex> lock(*mtx_);
     QuartcStream* ptr = (QuartcStream*)impl_->GetOrCreateStream(streamId);
     if (!ptr) return QuartcStreamPtr();
     auto self = this->shared_from_this();
     lock.release();
 
-    return QuartcStreamPtr(ptr, [self](QuartcStream*){
-                self->mtx_.unlock();
+    return QuartcStreamPtr(ptr, [=](QuartcStream*){
+                mtx_->unlock();
             });
 }
 
 void QuicSocketEntry::CloseStream(uint64_t streamId)
 {
-    std::unique_lock<std::recursive_mutex> lock(mtx_);
+    std::unique_lock<std::recursive_mutex> lock(*mtx_);
     impl_->CloseStream(streamId);
 }
 
@@ -410,7 +410,7 @@ void QuicSocketEntry::ProcessUdpPacket(const QuicSocketAddress& self_address,
 
     DebugPrint(dbg_connect | dbg_accept | dbg_write | dbg_read,
             "fd = %d, packet length = %d", Fd(), (int)packet.length());
-    std::unique_lock<std::recursive_mutex> lock(mtx_);
+    std::unique_lock<std::recursive_mutex> lock(*mtx_);
     impl_->FlushWrites();
     impl_->ProcessUdpPacket(self_address, peer_address, packet);
 }
@@ -492,7 +492,7 @@ std::string QuicSocketEntry::GetDebugInfo(int indent)
     std::string idt2 = idt + ' ';
     std::string idt3 = idt2 + ' ';
 
-    std::unique_lock<std::recursive_mutex> lock(mtx_);
+    std::unique_lock<std::recursive_mutex> lock(*mtx_);
     std::string info;
     info += idt + P("=========== Socket: %d ===========", Fd());
 

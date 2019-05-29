@@ -125,7 +125,7 @@ private:
     void ClearAcceptSocketByClose();
 
 private:
-    std::recursive_mutex mtx_;
+    std::shared_ptr<std::recursive_mutex> mtx_;
 
     std::shared_ptr<QuartcSession> impl_;
 
