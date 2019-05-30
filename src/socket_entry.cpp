@@ -142,8 +142,8 @@ int QuicSocketEntry::SetUdpSocket(int fd)
 
 ConnectionManager & QuicSocketEntry::GetConnectionManager()
 {
-    static ConnectionManager obj;
-    return obj;
+    static ConnectionManager *obj = new ConnectionManager;
+    return *obj;
 }
 
 // 链接建立前设置才有效, 握手协商后就直接取协商值使用了.

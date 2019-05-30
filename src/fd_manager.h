@@ -11,6 +11,10 @@ template <typename Entry>
 struct FdManager
 {
 public:
+    ~FdManager() {
+        DebugPrint(dbg_fd, "FdManager destroy. %p", this);
+    }
+
     void Put(int fd, Entry const& entry) {
         std::unique_lock<std::mutex> lock(mtx_);
         map_[fd] = entry;

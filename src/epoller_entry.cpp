@@ -412,8 +412,8 @@ int QuicEpollerEntry::Poll(struct epoll_event *events, int maxevents)
 }
 FdManager<QuicEpollerEntryPtr> & QuicEpollerEntry::GetFdManager()
 {
-    static FdManager<QuicEpollerEntryPtr> obj;
-    return obj;
+    static FdManager<QuicEpollerEntryPtr> *obj = new FdManager<QuicEpollerEntryPtr>;
+    return *obj;
 }
 
 QuicSocketAddress QuicEpollerEntry::GetLocalAddress(UdpSocket udpSocket)

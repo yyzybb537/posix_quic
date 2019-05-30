@@ -63,8 +63,8 @@ private:
         volatile int switchIdx_ = 0;
     };
     static Data& self() {
-        static Data obj;
-        return obj;
+        static Data *obj = new Data;
+        return *obj;
     }
     inline static uint64_t rdtsc() {
         uint32_t high, low;

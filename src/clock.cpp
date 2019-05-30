@@ -13,8 +13,8 @@ QuicClockImpl& QuicClockImpl::getInstance()
     static int ign = ClockInitialize();
     (void)ign;
 
-    static QuicClockImpl obj;
-    return obj;
+    static QuicClockImpl *obj = new QuicClockImpl;
+    return *obj;
 }
 
 int64_t QuicClockImpl::NowMicroseconds()

@@ -4,14 +4,14 @@ namespace posix_quic {
 
 FdFactory & EntryBase::GetFdFactory()
 {
-    static FdFactory obj;
-    return obj;
+    static FdFactory *obj = new FdFactory;
+    return *obj;
 }
 
 FdManager<EntryPtr> & EntryBase::GetFdManager()
 {
-    static FdManager<EntryPtr> obj;
-    return obj;
+    static FdManager<EntryPtr> *obj = new FdManager<EntryPtr>;
+    return *obj;
 }
 
 } // namespace posix_quic
