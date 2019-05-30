@@ -51,11 +51,29 @@ QuicEpollerEntry::QuicEpollerEntry()
         ev.events = EPOLLOUT | EPOLLET;
         ev.data.fd = socketPair_[0];
         ::epoll_ctl(Fd(), EPOLL_CTL_ADD, socketPair_[0], &ev);
+
+        std::thread thr(
+                [this]{
+                    while (!threadStop_) {
+                        std::unique_lock<std::mutex> lock(this->threadCvMtx_);
+                        this->threadCv_.wait_for(lock, std::chrono::milliseconds(10));
+                        this->Notify();
+                    }
+                });
+        timerNotifyThread_.swap(thr);
     }
 }
 
 QuicEpollerEntry::~QuicEpollerEntry()
 {
+    {
+        std::unique_lock<std::mutex> lock(this->threadCvMtx_);
+        threadCv_.notify_one();
+    }
+
+    if (timerNotifyThread_.joinable())
+        timerNotifyThread_.join();
+
     std::unique_lock<std::mutex> lock(mtx_);
     ::close(Fd());
     SetFd(-1);

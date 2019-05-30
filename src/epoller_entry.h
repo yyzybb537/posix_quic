@@ -7,6 +7,8 @@
 #include <sys/epoll.h>
 #include "header_parser.h"
 #include "task_runner.h"
+#include <thread>
+#include <condition_variable>
 
 namespace posix_quic {
 
@@ -85,6 +87,11 @@ private:
     HeaderParser headerParser_;
     QuicTaskRunner taskRunner_;
     std::atomic_flag notifyProtect_{false};
+
+    std::thread timerNotifyThread_;
+    std::condition_variable threadCv_;
+    std::mutex threadCvMtx_;
+    volatile bool threadStop_;
 };
 
 } // namespace posix_quic
