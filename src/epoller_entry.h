@@ -91,7 +91,7 @@ private:
     std::thread timerNotifyThread_;
     std::condition_variable threadCv_;
     std::mutex threadCvMtx_;
-    volatile bool threadStop_;
+    volatile bool threadStop_ = false;
 };
 
 } // namespace posix_quic

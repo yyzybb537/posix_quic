@@ -69,6 +69,7 @@ QuicEpollerEntry::~QuicEpollerEntry()
     {
         std::unique_lock<std::mutex> lock(this->threadCvMtx_);
         threadCv_.notify_one();
+        threadStop_ = true;
     }
 
     if (timerNotifyThread_.joinable())
