@@ -64,11 +64,19 @@ void QuicTaskRunner::RunOnce()
     for (auto & storage : triggers) {
         DebugPrint(dbg_timer, "start trigger schedule(id=%ld) task-count=%d", storage->id, (int)tasks_.size());
 
+        // 其他线程Writev的时候会先lock住std::recursive_mutex, 然后再调用Cancel
+        // 此处直接lock等待会导致ABBA死锁, 因此这里做一个活锁.
+lock_retry:
+
         {
             std::unique_lock<SpinLock> lock(storage->callLock, std::defer_lock);
             if (lock.try_lock()) {
                 TlsConnectionIdGuard guard(storage->connectionId);
-                std::unique_lock<std::recursive_mutex> lock(*storage->mtx);
+                std::unique_lock<std::recursive_mutex> rlock(*storage->mtx, std::defer_lock);
+                if (!rlock.try_lock()) {
+                    goto lock_retry;
+                }
+
                 storage->task->Run();
             }
         }
